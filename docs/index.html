@@ -145,9 +145,38 @@
   .sheet .actions { display: flex; gap: 10px; margin-top: 6px; }
   .sheet button { flex: 1; padding: 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-weight: 600; font-size: 14px; cursor: pointer; }
   .sheet button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .lock {
+    position: fixed; inset: 0; background: var(--bg); z-index: 50;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; padding: 24px;
+  }
+  .lock.hide { display: none; }
+  .lock .lock-icon { font-size: 30px; }
+  .lock h2 { margin: 0; font-size: 16px; }
+  .lock .lock-sub { font-size: 12.5px; color: var(--muted); text-align: center; max-width: 280px; }
+  .lock input {
+    width: 200px; text-align: center; font-size: 22px; letter-spacing: 0.3em;
+    padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  }
+  .lock button {
+    width: 200px; padding: 12px; border-radius: 10px; border: none;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .lock .lock-err { font-size: 12.5px; color: var(--bad); min-height: 16px; }
+  body.locked > header, body.locked > main { display: none; }
 </style>
 </head>
-<body>
+<body class="locked">
+
+<div class="lock" id="lockScreen">
+  <div class="lock-icon">🔒</div>
+  <h2>10 Smiths Avenue</h2>
+  <div class="lock-sub">Ingresa el PIN para ver y registrar movimientos.</div>
+  <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="lockInput" autofocus>
+  <div class="lock-err" id="lockErr"></div>
+  <button id="lockBtn">Entrar</button>
+</div>
 
 <header>
   <div>
@@ -345,6 +374,41 @@
 
 <script>
 (function () {
+  // ---- PIN lock ----
+  // Barrera simple, no es seguridad real: cualquiera que revise el código
+  // fuente de esta página (pública en GitHub Pages) puede ver el PIN. Solo
+  // evita que alguien que llega al link por casualidad entre y use la app.
+  var LOCK_PIN = '468023';
+  var LOCK_KEY = 'smithsAveUnlocked';
+  var lockScreen = document.getElementById('lockScreen');
+  var lockInput = document.getElementById('lockInput');
+  var lockErr = document.getElementById('lockErr');
+  var lockBtn = document.getElementById('lockBtn');
+
+  function unlock() {
+    document.body.classList.remove('locked');
+    lockScreen.classList.add('hide');
+    refreshRecent();
+  }
+  function tryUnlock() {
+    if (lockInput.value === LOCK_PIN) {
+      sessionStorage.setItem(LOCK_KEY, '1');
+      unlock();
+    } else {
+      lockErr.textContent = 'PIN incorrecto';
+      lockInput.value = '';
+      lockInput.focus();
+    }
+  }
+  lockBtn.addEventListener('click', tryUnlock);
+  lockInput.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') tryUnlock(); });
+  if (sessionStorage.getItem(LOCK_KEY) === '1') {
+    document.body.classList.remove('locked');
+    lockScreen.classList.add('hide');
+  } else {
+    lockInput.focus();
+  }
+
   var STORE_KEY = 'smithsAveConfig';
   function getConfig() {
     try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
@@ -515,7 +579,7 @@
       }).join('');
     }).catch(function () { list.innerHTML = '<div class="recent-empty">No se pudo conectar.</div>'; });
   }
-  refreshRecent();
+  if (sessionStorage.getItem(LOCK_KEY) === '1') { refreshRecent(); }
 })();
 </script>
 </body>
