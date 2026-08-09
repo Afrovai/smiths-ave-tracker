@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>10 Smiths Ave — Registro rápido</title>
+<style>
+  :root {
+    --bg: #f4f5f3;
+    --card: #ffffff;
+    --ink: #17201c;
+    --ink-2: #5b655f;
+    --muted: #8a938c;
+    --line: #e2e5e0;
+    --accent: #2f6b4f;
+    --accent-ink: #1f4a37;
+    --good: #1e7a3c;
+    --good-wash: #e9f4ec;
+    --bad: #b4392e;
+    --bad-wash: #f9eae8;
+    --pending: #b5701a;
+    --pending-wash: #faf0e2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1311;
+      --card: #171c19;
+      --ink: #eef1ee;
+      --ink-2: #aab3ac;
+      --muted: #7c847e;
+      --line: #2a302c;
+      --accent: #4fa87d;
+      --accent-ink: #a6dcc0;
+      --good: #3fbe72;
+      --good-wash: #163823;
+      --bad: #e2695a;
+      --bad-wash: #3a1f1c;
+      --pending: #e0a94a;
+      --pending-wash: #3a2c15;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 40px;
+  }
+  header {
+    padding: 18px 18px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 700; }
+  header .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .gear {
+    width: 36px; height: 36px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; cursor: pointer; color: var(--ink-2);
+  }
+  main { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+  .tabs {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 6px; margin-bottom: 16px;
+  }
+  .tab {
+    padding: 10px 4px; text-align: center; font-size: 13px; font-weight: 600;
+    border-radius: 9px; border: 1px solid var(--line); background: var(--card);
+    color: var(--ink-2); cursor: pointer;
+  }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; display: none; flex-direction: column; gap: 14px;
+  }
+  .card.active { display: flex; }
+
+  label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); display: block; margin-bottom: 6px; }
+  input, select, textarea {
+    width: 100%; padding: 12px 12px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink); font-size: 15px; font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .split-box {
+    border: 1px dashed var(--line); border-radius: 10px; padding: 12px;
+    background: var(--pending-wash);
+    display: none;
+    flex-direction: column; gap: 10px;
+  }
+  .split-box.show { display: flex; }
+  .split-box .head { display: flex; align-items: center; justify-content: space-between; }
+  .split-box .head span { font-size: 12.5px; font-weight: 700; color: var(--pending); }
+  .split-preview { font-size: 13px; color: var(--ink); }
+  .split-preview b { font-variant-numeric: tabular-nums; }
+  .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+
+  button.submit {
+    margin-top: 4px; padding: 14px; border-radius: 10px; border: none;
+    background: var(--accent); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  button.submit:disabled { opacity: 0.6; }
+  button.submit:active { transform: scale(0.99); }
+
+  .banner {
+    margin-top: 12px; padding: 12px 14px; border-radius: 10px; font-size: 13.5px; display: none;
+  }
+  .banner.ok { display: block; background: var(--good-wash); color: var(--good); }
+  .banner.err { display: block; background: var(--bad-wash); color: var(--bad); }
+
+  .recent { margin-top: 22px; }
+  .recent h2 { font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 10px; }
+  .recent-item {
+    display: flex; justify-content: space-between; gap: 10px; padding: 10px 0;
+    border-bottom: 1px solid var(--line); font-size: 13.5px;
+  }
+  .recent-item .l { color: var(--ink-2); }
+  .recent-item .r { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+  .recent-item .r.pending { color: var(--pending); }
+  .recent-empty { font-size: 13px; color: var(--muted); padding: 6px 0; }
+
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none;
+    align-items: flex-end; justify-content: center; z-index: 20;
+  }
+  .overlay.show { display: flex; }
+  .sheet {
+    background: var(--card); width: 100%; max-width: 480px; border-radius: 16px 16px 0 0;
+    padding: 20px 18px 26px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .sheet h2 { margin: 0 0 4px; font-size: 16px; }
+  .sheet .hint { font-size: 12px; color: var(--muted); margin-top: -6px; }
+  .sheet .actions { display: flex; gap: 10px; margin-top: 6px; }
+  .sheet button { flex: 1; padding: 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-weight: 600; font-size: 14px; cursor: pointer; }
+  .sheet button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>10 Smiths Avenue</h1>
+    <div class="sub">Registro rápido — Redcliffe</div>
+  </div>
+  <div class="gear" id="gearBtn">⚙</div>
+</header>
+
+<main>
+  <div class="tabs">
+    <div class="tab active" data-tab="expense">Gasto</div>
+    <div class="tab" data-tab="tenant">Arriendo</div>
+    <div class="tab" data-tab="landlord">Al dueño</div>
+  </div>
+
+  <!-- EXPENSE -->
+  <form class="card active" id="form-expense">
+    <div class="row2">
+      <div>
+        <label>Fecha</label>
+        <input type="date" name="date" required>
+      </div>
+      <div>
+        <label>Monto (AUD)</label>
+        <input type="number" name="amount" step="0.01" min="0" placeholder="0.00" required>
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>Método de pago</label>
+        <select name="paymentMethod">
+          <option>Transfer</option>
+          <option>Cash</option>
+          <option>Card</option>
+          <option>BPAY</option>
+        </select>
+      </div>
+      <div>
+        <label>Tipo</label>
+        <select name="type" id="expenseType">
+          <option>House</option>
+          <option>Internet</option>
+          <option>Water</option>
+          <option>Electricity</option>
+          <option>Gas</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <label>Detalle</label>
+      <input type="text" name="detail" placeholder="Ej: Cuenta de la luz marzo">
+    </div>
+
+    <div class="split-box" id="splitBox">
+      <div class="head">
+        <span>DIVIDIR CON INQUILINO</span>
+        <label class="toggle-row"><input type="checkbox" id="autoSplit" checked> Activado</label>
+      </div>
+      <div class="row2">
+        <div>
+          <label>Inquilino</label>
+          <input type="text" id="splitTenant" list="tenantList">
+        </div>
+        <div>
+          <label>% que le corresponde</label>
+          <input type="number" id="splitPct" min="0" max="100" step="1">
+        </div>
+      </div>
+      <div class="split-preview">Se creará un cobro pendiente de <b id="splitAmountPreview">$0</b> para <span id="splitTenantPreview">—</span> en la hoja de Arriendo.</div>
+    </div>
+
+    <button type="submit" class="submit">Registrar gasto</button>
+    <div class="banner" id="banner-expense"></div>
+  </form>
+
+  <!-- TENANT -->
+  <form class="card" id="form-tenant">
+    <div class="row2">
+      <div>
+        <label>Fecha</label>
+        <input type="date" name="date" required>
+      </div>
+      <div>
+        <label>Monto (AUD)</label>
+        <input type="number" name="amount" step="0.01" min="0" placeholder="0.00" required>
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>Método de pago</label>
+        <select name="paymentMethod">
+          <option>Transfer</option>
+          <option>Cash</option>
+        </select>
+      </div>
+      <div>
+        <label>Tipo</label>
+        <select name="type">
+          <option>Rent</option>
+          <option>Bond Held</option>
+          <option>Refund</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>Room</label>
+        <select name="room">
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
+      </div>
+      <div>
+        <label>Inquilino</label>
+        <input type="text" name="tenant" list="tenantList" required>
+      </div>
+    </div>
+    <div>
+      <label>Detalle</label>
+      <input type="text" name="detail" placeholder="Ej: 09/03/26 - 22/03/26">
+    </div>
+    <button type="submit" class="submit">Registrar pago de arriendo</button>
+    <div class="banner" id="banner-tenant"></div>
+  </form>
+
+  <!-- LANDLORD -->
+  <form class="card" id="form-landlord">
+    <div class="row2">
+      <div>
+        <label>Fecha</label>
+        <input type="date" name="date" required>
+      </div>
+      <div>
+        <label>Monto (AUD)</label>
+        <input type="number" name="amount" step="0.01" min="0" placeholder="0.00" required>
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>Método de pago</label>
+        <select name="paymentMethod">
+          <option>Transfer</option>
+          <option>Cash</option>
+        </select>
+      </div>
+      <div>
+        <label>Tipo</label>
+        <select name="type">
+          <option>Rent</option>
+          <option>Bond</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <label>Detalle</label>
+      <input type="text" name="detail" placeholder="Ej: 07/07/26 - 21/07/26">
+    </div>
+    <button type="submit" class="submit">Registrar pago al dueño</button>
+    <div class="banner" id="banner-landlord"></div>
+  </form>
+
+  <datalist id="tenantList">
+    <option value="Juan Plata">
+    <option value="Nury">
+    <option value="Krishna">
+    <option value="Annapaula">
+  </datalist>
+
+  <div class="recent">
+    <h2>Actividad reciente</h2>
+    <div id="recentList"><div class="recent-empty">Configura la conexión (⚙) para ver esto.</div></div>
+  </div>
+</main>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <h2>Conexión con la planilla</h2>
+    <div class="hint">Pega aquí la URL del Apps Script Web App (termina en /exec) — ver apps-script/README.md.</div>
+    <label>URL del Web App</label>
+    <input type="text" id="cfgUrl" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+    <label>Secreto compartido</label>
+    <input type="text" id="cfgSecret" value="5EGVxQhUJ2RsQ10dFUEkHAuM">
+    <label>Inquilino por defecto para dividir cuentas (Room 2)</label>
+    <input type="text" id="cfgDefaultTenant" value="Juan Plata">
+    <div class="actions">
+      <button id="cfgCancel">Cancelar</button>
+      <button id="cfgSave" class="primary">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var STORE_KEY = 'smithsAveConfig';
+  function getConfig() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function saveConfig(cfg) { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); }
+
+  var cfg = getConfig();
+  var overlay = document.getElementById('overlay');
+  var gearBtn = document.getElementById('gearBtn');
+
+  function openSettings() {
+    document.getElementById('cfgUrl').value = cfg.url || '';
+    document.getElementById('cfgSecret').value = cfg.secret || '5EGVxQhUJ2RsQ10dFUEkHAuM';
+    document.getElementById('cfgDefaultTenant').value = cfg.defaultTenant || 'Juan Plata';
+    overlay.classList.add('show');
+  }
+  gearBtn.addEventListener('click', openSettings);
+  document.getElementById('cfgCancel').addEventListener('click', function () { overlay.classList.remove('show'); });
+  document.getElementById('cfgSave').addEventListener('click', function () {
+    cfg = {
+      url: document.getElementById('cfgUrl').value.trim(),
+      secret: document.getElementById('cfgSecret').value.trim(),
+      defaultTenant: document.getElementById('cfgDefaultTenant').value.trim() || 'Juan Plata'
+    };
+    saveConfig(cfg);
+    overlay.classList.remove('show');
+    document.getElementById('splitTenant').value = cfg.defaultTenant;
+    refreshRecent();
+  });
+
+  if (!cfg.url) { setTimeout(openSettings, 300); }
+
+  // ---- tabs ----
+  var tabs = document.querySelectorAll('.tab');
+  var cards = document.querySelectorAll('.card');
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      tabs.forEach(function (x) { x.classList.remove('active'); });
+      cards.forEach(function (x) { x.classList.remove('active'); });
+      t.classList.add('active');
+      document.getElementById('form-' + t.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---- default dates ----
+  var today = new Date().toISOString().slice(0, 10);
+  document.querySelectorAll('input[name="date"]').forEach(function (i) { i.value = today; });
+
+  // ---- expense split logic ----
+  var SPLITTABLE = { Electricity: 0.5, Water: 0.5, Gas: 0.5, Internet: 0.5 };
+  var expenseType = document.getElementById('expenseType');
+  var splitBox = document.getElementById('splitBox');
+  var splitTenant = document.getElementById('splitTenant');
+  var splitPct = document.getElementById('splitPct');
+  var amountInput = document.querySelector('#form-expense input[name="amount"]');
+
+  function updateSplitUI() {
+    var frac = SPLITTABLE[expenseType.value];
+    if (frac) {
+      splitBox.classList.add('show');
+      if (!splitPct.value) splitPct.value = Math.round(frac * 100);
+      if (!splitTenant.value) splitTenant.value = cfg.defaultTenant || 'Juan Plata';
+    } else {
+      splitBox.classList.remove('show');
+    }
+    updateSplitPreview();
+  }
+  function updateSplitPreview() {
+    var amt = Number(amountInput.value || 0);
+    var pct = Number(splitPct.value || 0);
+    var share = Math.round(amt * pct) / 100;
+    document.getElementById('splitAmountPreview').textContent = '$' + share.toFixed(2);
+    document.getElementById('splitTenantPreview').textContent = splitTenant.value || '—';
+  }
+  expenseType.addEventListener('change', updateSplitUI);
+  amountInput.addEventListener('input', updateSplitPreview);
+  splitPct.addEventListener('input', updateSplitPreview);
+  splitTenant.addEventListener('input', updateSplitPreview);
+  updateSplitUI();
+
+  // ---- submit handling ----
+  function showBanner(id, ok, msg) {
+    var el = document.getElementById(id);
+    el.className = 'banner ' + (ok ? 'ok' : 'err');
+    el.textContent = msg;
+    setTimeout(function () { el.className = 'banner'; }, 5000);
+  }
+
+  function post(payload) {
+    if (!cfg.url) { openSettings(); return Promise.reject(new Error('Sin configurar')); }
+    payload.secret = cfg.secret;
+    // Content-Type text/plain a propósito: evita el preflight CORS que
+    // Apps Script Web Apps no maneja bien.
+    return fetch(cfg.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); });
+  }
+
+  document.getElementById('form-expense').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var f = ev.target;
+    var payload = {
+      action: 'addExpense',
+      date: f.date.value,
+      amount: f.amount.value,
+      paymentMethod: f.paymentMethod.value,
+      type: f.type.value,
+      detail: f.detail.value,
+      autoSplit: splitBox.classList.contains('show') ? document.getElementById('autoSplit').checked : false,
+      splitTenant: splitTenant.value,
+      splitPct: Number(splitPct.value || 0) / 100
+    };
+    post(payload).then(function (res) {
+      if (res.ok) {
+        var extra = res.created.length > 1 ? ' + cobro pendiente creado' : '';
+        showBanner('banner-expense', true, 'Registrado' + extra + '.');
+        f.reset(); f.date.value = today; updateSplitUI();
+        refreshRecent();
+      } else { showBanner('banner-expense', false, res.error || 'Error'); }
+    }).catch(function (e) { showBanner('banner-expense', false, String(e)); });
+  });
+
+  document.getElementById('form-tenant').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var f = ev.target;
+    post({
+      action: 'addTenantPayment',
+      date: f.date.value, amount: f.amount.value, paymentMethod: f.paymentMethod.value,
+      type: f.type.value, room: f.room.value, tenant: f.tenant.value, detail: f.detail.value
+    }).then(function (res) {
+      if (res.ok) { showBanner('banner-tenant', true, 'Registrado.'); f.reset(); f.date.value = today; refreshRecent(); }
+      else { showBanner('banner-tenant', false, res.error || 'Error'); }
+    }).catch(function (e) { showBanner('banner-tenant', false, String(e)); });
+  });
+
+  document.getElementById('form-landlord').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var f = ev.target;
+    post({
+      action: 'addLandlordPayment',
+      date: f.date.value, amount: f.amount.value, paymentMethod: f.paymentMethod.value,
+      type: f.type.value, detail: f.detail.value
+    }).then(function (res) {
+      if (res.ok) { showBanner('banner-landlord', true, 'Registrado.'); f.reset(); f.date.value = today; refreshRecent(); }
+      else { showBanner('banner-landlord', false, res.error || 'Error'); }
+    }).catch(function (e) { showBanner('banner-landlord', false, String(e)); });
+  });
+
+  // ---- recent activity ----
+  function refreshRecent() {
+    var list = document.getElementById('recentList');
+    if (!cfg.url) { list.innerHTML = '<div class="recent-empty">Configura la conexión (⚙) para ver esto.</div>'; return; }
+    var url = cfg.url + '?secret=' + encodeURIComponent(cfg.secret) + '&recent=4';
+    fetch(url).then(function (r) { return r.json(); }).then(function (res) {
+      if (!res.ok) { list.innerHTML = '<div class="recent-empty">' + (res.error || 'Error al cargar') + '</div>'; return; }
+      var rows = [];
+      ['Expenses', 'Tenants', 'To Landlord'].forEach(function (sheet) {
+        (res.recent[sheet] || []).forEach(function (r) {
+          rows.push({ sheet: sheet, date: r['Date'], amount: r['Amount'], detail: r['Detail'] || r['Tenant'] || '', pending: r['Payment Method'] === 'Pending' });
+        });
+      });
+      if (!rows.length) { list.innerHTML = '<div class="recent-empty">Sin movimientos todavía.</div>'; return; }
+      list.innerHTML = rows.slice(0, 6).map(function (r) {
+        return '<div class="recent-item"><span class="l">' + r.sheet + ' · ' + (r.date || '') + '<br>' + (r.detail || '') + '</span>' +
+               '<span class="r' + (r.pending ? ' pending' : '') + '">$' + r.amount + '</span></div>';
+      }).join('');
+    }).catch(function () { list.innerHTML = '<div class="recent-empty">No se pudo conectar.</div>'; });
+  }
+  refreshRecent();
+})();
+</script>
+</body>
+</html>
