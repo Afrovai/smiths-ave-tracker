@@ -7,9 +7,14 @@
  *  - Si un gasto es de un tipo "compartible" (luz, agua, gas, internet),
  *    calcula automáticamente el monto que le corresponde pagar al inquilino
  *    del Room 2 y crea un cobro pendiente en "Tenants".
+ *  - En "To Landlord" (que ya trae fechas futuras precargadas con el monto
+ *    vacío), si existe una fila con esa misma fecha y sin monto, la completa
+ *    ahí en vez de agregar una fila nueva y duplicada. Si no encuentra una
+ *    fila así, agrega una fila nueva al final, igual que en las otras pestañas.
  *  - NO toca ni recalcula las columnas de totales acumulados que ya existen
- *    más a la derecha en "Tenants" — solo agrega filas nuevas usando los
- *    encabezados de la fila 1 de cada pestaña, así nunca pisa datos.
+ *    más a la derecha en "Tenants" — solo escribe en las columnas que
+ *    encuentra por nombre en la fila real de encabezados de cada pestaña
+ *    (no es la fila 1 en ninguna de las tres — ver findHeaderRow).
  *
  * Instrucciones de despliegue: ver apps-script/README.md en este mismo repo.
  */
@@ -70,7 +75,7 @@ function doPost(e) {
           'Payment Method': 'Pending',
           'Type': body.type,
           'Detail': 'Pendiente: ' + Math.round(pct * 100) + '% de cuenta de ' + body.type +
-                    ' ($' + body.amount + ' del ' + body.date + ')',
+                    ' ($' + body.amount + ' del ' + formatIsoDate(body.date, 'dd/MM/yyyy') + ')',
           'Tenant': tenant
         });
         created.push({ sheet: 'Tenants', amount: share, tenant: tenant, pending: true });
@@ -151,16 +156,84 @@ function findHeaderRow(sheet) {
   throw new Error('No se encontró la fila de encabezados ("Date" en columna A) en ' + sheet.getName());
 }
 
+// Formato de fecha que usa cada pestaña en sus filas existentes — se usa
+// solo para ESCRIBIR una fecha consistente con lo que ya hay en la columna.
+const DATE_FORMAT = {
+  'Tenants': 'dd/MM/yy',
+  'Expenses': 'dd/MM/yy',
+  'To Landlord': 'dd/MM/yyyy'
+};
+
 function appendRow(ss, sheetName, valuesByHeader) {
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error('No existe la pestaña: ' + sheetName);
   const headerRow = findHeaderRow(sheet);
   const lastCol = Math.max(sheet.getLastColumn(), 1);
   const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
+
+  // Normaliza la fecha que llega de la app (yyyy-mm-dd) al formato que usa
+  // esta pestaña en particular, para que quede igual que las filas vecinas.
+  const values = Object.assign({}, valuesByHeader);
+  if (values['Date']) {
+    const fmt = DATE_FORMAT[sheetName] || 'dd/MM/yyyy';
+    values['Date'] = formatIsoDate(values['Date'], fmt);
+  }
+
+  const dateColIdx = headers.indexOf('Date');
+  const amountColIdx = headers.indexOf('Amount');
+
+  // Si ya existe una fila para esta fecha con el monto vacío (el caso de
+  // "To Landlord", que trae fechas futuras precargadas), se completa esa
+  // fila en vez de agregar una nueva y duplicada.
+  if (dateColIdx !== -1 && amountColIdx !== -1) {
+    const lastRow = sheet.getLastRow();
+    if (lastRow > headerRow) {
+      const body = sheet.getRange(headerRow + 1, 1, lastRow - headerRow, lastCol).getValues();
+      const wanted = normalizeDateForCompare(values['Date']);
+      for (let i = 0; i < body.length; i++) {
+        const cellDate = normalizeDateForCompare(body[i][dateColIdx]);
+        const amountEmpty = body[i][amountColIdx] === '' || body[i][amountColIdx] === null;
+        if (wanted && cellDate === wanted && amountEmpty) {
+          const targetRow = headerRow + 1 + i;
+          headers.forEach(function (h, c) {
+            if (h && Object.prototype.hasOwnProperty.call(values, h)) {
+              sheet.getRange(targetRow, c + 1).setValue(values[h]);
+            }
+          });
+          return;
+        }
+      }
+    }
+  }
+
   const row = headers.map(function (h) {
-    return Object.prototype.hasOwnProperty.call(valuesByHeader, h) ? valuesByHeader[h] : '';
+    return Object.prototype.hasOwnProperty.call(values, h) ? values[h] : '';
   });
   sheet.appendRow(row);
+}
+
+// "2026-08-04" (input type=date) -> "04/08/2026" o "04/08/26" según fmt.
+function formatIsoDate(isoStr, fmt) {
+  const m = String(isoStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return isoStr; // no vino en el formato esperado, se deja tal cual
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), fmt);
+}
+
+// Convierte un valor de fecha (Date real de Sheets, o texto dd/mm/yy[yy])
+// a una forma canónica "dd/mm/yyyy" para poder comparar sin importar si la
+// pestaña usa año de 2 o 4 dígitos, o si la celda quedó como texto o Date.
+function normalizeDateForCompare(value) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  }
+  const s = String(value || '').trim();
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (!m) return null;
+  const dd = m[1].padStart(2, '0');
+  const mm = m[2].padStart(2, '0');
+  const yyyy = m[3].length === 2 ? '20' + m[3] : m[3];
+  return dd + '/' + mm + '/' + yyyy;
 }
 
 function lastRows(ss, sheetName, n) {
