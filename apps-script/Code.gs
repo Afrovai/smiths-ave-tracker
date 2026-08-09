@@ -4,17 +4,20 @@
  * Qué hace:
  *  - Recibe POST desde la app web (GitHub Pages) y agrega filas nuevas a las
  *    pestañas "Expenses", "Tenants" o "To Landlord" de la planilla.
- *  - Si un gasto es de un tipo "compartible" (luz, agua, gas, internet),
- *    calcula automáticamente el monto que le corresponde pagar al inquilino
- *    del Room 2 y crea un cobro pendiente en "Tenants".
+ *  - Mantiene una pestaña nueva "Arrendatarios" (la crea sola si no existe)
+ *    con la ficha de cada persona: pieza, renta, frecuencia de pago, si paga
+ *    servicios, bond, foto de ID y comprobante de ingreso (subidos a una
+ *    carpeta privada de Drive, solo visibles para el dueño de la cuenta).
+ *  - Si un gasto es de un tipo "compartible" (luz, agua, gas, internet), la
+ *    divide entre quien(es) estén marcados como "Paga Servicios: Sí" en el
+ *    registro de arrendatarios (ya no depende de un nombre fijo en el código).
  *  - En "To Landlord" (que ya trae fechas futuras precargadas con el monto
  *    vacío), si existe una fila con esa misma fecha y sin monto, la completa
- *    ahí en vez de agregar una fila nueva y duplicada. Si no encuentra una
- *    fila así, agrega una fila nueva al final, igual que en las otras pestañas.
- *  - NO toca ni recalcula las columnas de totales acumulados que ya existen
- *    más a la derecha en "Tenants" — solo escribe en las columnas que
- *    encuentra por nombre en la fila real de encabezados de cada pestaña
- *    (no es la fila 1 en ninguna de las tres — ver findHeaderRow).
+ *    ahí en vez de agregar una fila nueva y duplicada.
+ *  - NO toca ni recalcula las columnas/celdas de totales automáticos que ya
+ *    existen en tu planilla (los totales por categoría en "Expenses", el
+ *    resumen lateral de "Tenants") — el dashboard los LEE tal cual están,
+ *    no los recalcula por su cuenta.
  *
  * Instrucciones de despliegue: ver apps-script/README.md en este mismo repo.
  */
@@ -23,12 +26,12 @@
 const SHEET_ID = '1Z8asY7OdehqG5yCrcw2uB9xP9ZE7Zb16aXpasg4W1tA';
 
 // Debe coincidir EXACTO con el secreto que configures en la app web.
-// Cámbialo si quieres (y actualízalo también en la app) — es la única
-// protección del endpoint, ya que el Web App queda con acceso "Anyone".
 const SECRET = '5EGVxQhUJ2RsQ10dFUEkHAuM';
 
-// Tipos de gasto que se dividen automáticamente con el inquilino del Room 2,
-// y qué fracción le corresponde a él. Ajusta libremente.
+// Tipos de gasto que se dividen automáticamente entre quienes "pagan
+// servicios" en el registro de arrendatarios, y qué fracción del total
+// les corresponde a ellos en conjunto (se reparte en partes iguales entre
+// todos los que pagan servicios).
 const SPLIT_RULES = {
   'Electricity': 0.5,
   'Water': 0.5,
@@ -36,9 +39,28 @@ const SPLIT_RULES = {
   'Internet': 0.5
 };
 
-// Inquilino por defecto al que se le carga la mitad de las cuentas — cambia
-// esto cuando cambie el inquilino del Room 2 (o mándalo desde la app).
+// Fallback SOLO si el registro de "Arrendatarios" está vacío todavía (nadie
+// marcado como "Paga Servicios: Sí") — así la app sigue funcionando igual
+// que antes mientras cargas las fichas por primera vez.
 const DEFAULT_SPLIT_TENANT = 'Juan Plata';
+
+// Piezas de la casa — renta de referencia y frecuencia habitual. Editable
+// por ficha individual en el registro (esto es solo el valor por defecto).
+const ROOMS = {
+  'Pieza 1': { rentPerWeek: 280, frequency: 'Mensual' },
+  'Pieza 2': { rentPerWeek: 390, frequency: 'Quincenal' }
+};
+const ROOM_TO_NUMBER = { 'Pieza 1': 1, 'Pieza 2': 2 };
+const NUMBER_TO_ROOM_LABEL = { '1': 'Pieza 1', '2': 'Pieza 2', 1: 'Pieza 1', 2: 'Pieza 2' };
+const HOUSE_RENT_PER_WEEK = 800; // total a pagar al arrendador, se paga quincenal
+
+const REGISTRY_SHEET = 'Arrendatarios';
+const REGISTRY_HEADERS = [
+  'ID', 'Nombre', 'Pieza', 'Renta', 'Frecuencia', 'Paga Servicios',
+  'Bond Monto', 'Bond Fecha', 'Bond Detalle', 'Foto ID', 'Comprobante Ingreso',
+  'Fecha Inicio', 'Estado'
+];
+const DOCS_FOLDER_NAME = '10 Smiths Avenue - Documentos (privado)';
 
 function doPost(e) {
   try {
@@ -66,19 +88,28 @@ function doPost(e) {
 
       const frac = SPLIT_RULES[body.type];
       if (frac && body.autoSplit !== false) {
-        const tenant = body.splitTenant || DEFAULT_SPLIT_TENANT;
         const pct = body.splitPct != null ? Number(body.splitPct) : frac;
-        const share = round2(Number(body.amount) * pct);
-        appendRow(ss, 'Tenants', {
-          'Date': body.date,
-          'Amount': share,
-          'Payment Method': 'Pending',
-          'Type': body.type,
-          'Detail': 'Pendiente: ' + Math.round(pct * 100) + '% de cuenta de ' + body.type +
-                    ' ($' + body.amount + ' del ' + formatIsoDate(body.date, 'dd/MM/yyyy') + ')',
-          'Tenant': tenant
+        const totalShare = round2(Number(body.amount) * pct);
+        let payers = getBillPayers(ss);
+        if (!payers.length) {
+          // Registro vacío todavía — modo compatible con la versión anterior.
+          payers = [{ name: body.splitTenant || DEFAULT_SPLIT_TENANT, room: '' }];
+        }
+        const perPayerShare = round2(totalShare / payers.length);
+        payers.forEach(function (p) {
+          appendRow(ss, 'Tenants', {
+            'Date': body.date,
+            'Amount': perPayerShare,
+            'Payment Method': 'Pending',
+            'Type': body.type,
+            'Detail': 'Pendiente: parte de cuenta de ' + body.type +
+                      ' ($' + body.amount + ' del ' + formatIsoDate(body.date, 'dd/MM/yyyy') + ')' +
+                      (p.room ? ' — ' + p.room : ''),
+            'Tenant': p.name,
+            'Room': p.room ? String(ROOM_TO_NUMBER[p.room] || '') : ''
+          });
+          created.push({ sheet: 'Tenants', amount: perPayerShare, tenant: p.name, pending: true });
         });
-        created.push({ sheet: 'Tenants', amount: share, tenant: tenant, pending: true });
       }
 
     } else if (body.action === 'addTenantPayment') {
@@ -105,6 +136,30 @@ function doPost(e) {
       });
       created.push({ sheet: 'To Landlord', amount: Number(body.amount) });
 
+    } else if (body.action === 'addTenantProfile') {
+      requireFields(body, ['name', 'room']);
+      const sheet = ensureRegistrySheet(ss);
+      const fields = {
+        'Nombre': body.name,
+        'Pieza': body.room,
+        'Renta': body.rent != null && body.rent !== '' ? Number(body.rent) : (ROOMS[body.room] ? ROOMS[body.room].rentPerWeek : ''),
+        'Frecuencia': body.frequency || (ROOMS[body.room] ? ROOMS[body.room].frequency : ''),
+        'Paga Servicios': body.paysUtilities ? 'Sí' : 'No',
+        'Bond Monto': body.bondAmount != null && body.bondAmount !== '' ? Number(body.bondAmount) : '',
+        'Bond Fecha': body.bondDate ? formatIsoDate(body.bondDate, 'dd/MM/yyyy') : '',
+        'Bond Detalle': body.bondDetail || '',
+        'Fecha Inicio': body.startDate ? formatIsoDate(body.startDate, 'dd/MM/yyyy') : formatIsoDate(new Date().toISOString().slice(0, 10), 'dd/MM/yyyy'),
+        'Estado': body.status || 'Activo'
+      };
+      if (body.idPhoto && body.idPhoto.base64) {
+        fields['Foto ID'] = saveUploadedFile(body.idPhoto, body.name + ' - ID');
+      }
+      if (body.incomeProof && body.incomeProof.base64) {
+        fields['Comprobante Ingreso'] = saveUploadedFile(body.incomeProof, body.name + ' - Ingreso');
+      }
+      const result = upsertRegistryRow(sheet, body.name, fields);
+      created.push({ sheet: 'Arrendatarios', tenant: body.name, updated: result.updated });
+
     } else {
       return jsonOut({ ok: false, error: 'Acción desconocida: ' + body.action });
     }
@@ -117,8 +172,9 @@ function doPost(e) {
 }
 
 /**
- * GET ?secret=...&recent=5        -> últimas filas de cada pestaña.
- * GET ?secret=...&summary=1       -> totales agregados para el dashboard.
+ * GET ?secret=...&recent=5   -> últimas filas de cada pestaña.
+ * GET ?secret=...&summary=1  -> totales agregados para el dashboard.
+ * GET ?secret=...&tenants=1  -> fichas del registro de arrendatarios.
  */
 function doGet(e) {
   try {
@@ -129,6 +185,9 @@ function doGet(e) {
 
     if (e.parameter.summary) {
       return jsonOut({ ok: true, summary: computeSummary(ss) });
+    }
+    if (e.parameter.tenants) {
+      return jsonOut({ ok: true, tenants: getRegistryRows(ss), rooms: ROOMS });
     }
 
     const n = Number(e.parameter.recent || 5);
@@ -142,12 +201,99 @@ function doGet(e) {
   }
 }
 
+// ---------- registro de arrendatarios ----------
+
+function ensureRegistrySheet(ss) {
+  let sheet = ss.getSheetByName(REGISTRY_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(REGISTRY_SHEET);
+    sheet.getRange(1, 1, 1, REGISTRY_HEADERS.length).setValues([REGISTRY_HEADERS]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+// Si ya existe una ficha con ese nombre (sin importar mayúsculas), la
+// actualiza en vez de crear una duplicada — así "Renta"/"Frecuencia"/etc.
+// quedan editables solo con volver a enviar el formulario con el mismo nombre.
+function upsertRegistryRow(sheet, name, fields) {
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const nameIdx = headers.indexOf('Nombre');
+  let targetRow = -1;
+
+  if (lastRow > 1) {
+    const data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    for (let i = 0; i < data.length; i++) {
+      if (String(data[i][nameIdx]).trim().toLowerCase() === name.trim().toLowerCase()) {
+        targetRow = 2 + i;
+        break;
+      }
+    }
+  }
+
+  if (targetRow === -1) {
+    const row = headers.map(function (h) {
+      if (h === 'ID') return Utilities.getUuid().slice(0, 8);
+      return Object.prototype.hasOwnProperty.call(fields, h) ? fields[h] : '';
+    });
+    sheet.appendRow(row);
+    return { updated: false };
+  }
+
+  headers.forEach(function (h, c) {
+    if (Object.prototype.hasOwnProperty.call(fields, h)) {
+      sheet.getRange(targetRow, c + 1).setValue(fields[h]);
+    }
+  });
+  return { updated: true };
+}
+
+function getRegistryRows(ss) {
+  const sheet = ss.getSheetByName(REGISTRY_SHEET);
+  if (!sheet) return [];
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2) return [];
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  return data.map(function (row) { return rowToObject(headers, row); });
+}
+
+function getActiveTenants(ss) {
+  return getRegistryRows(ss).filter(function (r) { return r['Estado'] === 'Activo'; });
+}
+
+function getBillPayers(ss) {
+  return getActiveTenants(ss)
+    .filter(function (r) { return r['Paga Servicios'] === 'Sí'; })
+    .map(function (r) { return { name: r['Nombre'], room: r['Pieza'] }; });
+}
+
+// ---------- archivos (foto de ID / comprobante de ingreso) ----------
+
+// Los archivos quedan en una carpeta de Drive SIN compartir — visibles solo
+// para tu cuenta de Google, igual que cualquier archivo tuyo por defecto.
+function getDocsFolder() {
+  const it = DriveApp.getFoldersByName(DOCS_FOLDER_NAME);
+  if (it.hasNext()) return it.next();
+  return DriveApp.createFolder(DOCS_FOLDER_NAME);
+}
+
+function saveUploadedFile(fileObj, namePrefix) {
+  const bytes = Utilities.base64Decode(fileObj.base64);
+  const blob = Utilities.newBlob(bytes, fileObj.mimeType || 'image/jpeg', namePrefix + ' - ' + (fileObj.filename || 'archivo'));
+  const file = getDocsFolder().createFile(blob);
+  return file.getUrl();
+}
+
 /**
  * Junta todos los movimientos reales (sin las filas futuras vacías de
  * "To Landlord") y arma los totales para el dashboard: cuánto se le ha
- * pagado al arrendador, cuánto se ha gastado en la casa (por tipo), y
- * cuánto ha pagado/debe cada inquilino (por tipo, y separando lo ya
- * cobrado de lo pendiente).
+ * pagado al arrendador, cuánto se ha gastado en la casa (por tipo), cuánto
+ * ha pagado/debe cada inquilino, lo mismo por pieza, y además LEE tal cual
+ * (sin recalcular) los totales automáticos que ya existen en tu planilla.
  */
 function computeSummary(ss) {
   const expenses = allRows(ss, 'Expenses').filter(function (r) { return r['Amount'] !== '' && r['Amount'] != null; });
@@ -164,6 +310,7 @@ function computeSummary(ss) {
   const pendingByTenant = {};
   const byTypePerTenant = {};
   const utilityChargedToTenants = { Internet: 0, Water: 0, Electricity: 0, Gas: 0 };
+  const byRoom = {};
 
   tenantRows.forEach(function (r) {
     const tenant = r['Tenant'];
@@ -184,10 +331,23 @@ function computeSummary(ss) {
     if (utilityChargedToTenants.hasOwnProperty(type)) {
       utilityChargedToTenants[type] = round2(utilityChargedToTenants[type] + amt);
     }
+
+    const roomLabel = NUMBER_TO_ROOM_LABEL[r['Room']] || (r['Room'] ? ('Pieza ' + r['Room']) : 'Sin pieza asignada');
+    byRoom[roomLabel] = byRoom[roomLabel] || { total: 0, byType: {} };
+    byRoom[roomLabel].total = round2(byRoom[roomLabel].total + amt);
+    byRoom[roomLabel].byType[type] = round2((byRoom[roomLabel].byType[type] || 0) + amt);
   });
 
   const totalPaidByTenants = round2(sumValues(paidByTenant));
   const totalPendingFromTenants = round2(sumValues(pendingByTenant));
+
+  const expensesSheet = ss.getSheetByName('Expenses');
+  const expensesAutoTotals = expensesSheet
+    ? readSideTotals(expensesSheet, ['House', 'Internet', 'Water', 'Electricity', 'Gas', 'Total'])
+    : {};
+
+  const tenantsSheet = ss.getSheetByName('Tenants');
+  const tenantsSnapshot = tenantsSheet ? readTenantsSideSnapshot(tenantsSheet) : null;
 
   return {
     landlord: { total: round2(landlordTotal), byType: landlordByType },
@@ -200,6 +360,13 @@ function computeSummary(ss) {
       totalPending: totalPendingFromTenants
     },
     utilityChargedToTenants: utilityChargedToTenants,
+    byRoom: byRoom,
+    registry: getRegistryRows(ss),
+    // Tal cual están en tu Excel — no recalculados por esta app.
+    autoTotals: {
+      expenses: expensesAutoTotals,
+      tenantsSideSnapshot: tenantsSnapshot
+    },
     bigPicture: {
       cobradoATenants: totalPaidByTenants,
       pagadoALandlord: round2(landlordTotal),
@@ -207,6 +374,61 @@ function computeSummary(ss) {
       margenNeto: round2(totalPaidByTenants - landlordTotal - expenseTotal)
     }
   };
+}
+
+// Busca en TODA la hoja pares "etiqueta -> valor" (la etiqueta en una
+// celda, el valor en la celda inmediatamente a la derecha) para las
+// etiquetas dadas — así encuentra los totales automáticos de "Expenses"
+// sin depender de en qué columna exacta estén.
+function readSideTotals(sheet, labels) {
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 1 || lastCol < 2) return {};
+  const grid = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  const out = {};
+  for (let r = 0; r < grid.length; r++) {
+    for (let c = 0; c < grid[r].length - 1; c++) {
+      const label = String(grid[r][c]).trim();
+      if (labels.indexOf(label) !== -1 && grid[r][c + 1] !== '') {
+        out[label] = grid[r][c + 1];
+      }
+    }
+  }
+  return out;
+}
+
+// "Tenants" tiene una segunda columna "Tenant" + Rent/Bond Held/Internet/
+// Water/Electricity/Gas que tú vas anotando a mano de vez en cuando como
+// resumen del Room 2 — se lee el último valor no vacío de esas columnas,
+// tal cual está, y se etiqueta claramente como "lo que ya llevas anotado".
+function readTenantsSideSnapshot(sheet) {
+  const headerRow = findHeaderRow(sheet);
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
+
+  let firstTenantIdx = -1, secondTenantIdx = -1;
+  headers.forEach(function (h, i) {
+    if (h === 'Tenant') {
+      if (firstTenantIdx === -1) firstTenantIdx = i; else if (secondTenantIdx === -1) secondTenantIdx = i;
+    }
+  });
+  if (secondTenantIdx === -1) return null;
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= headerRow) return null;
+  const data = sheet.getRange(headerRow + 1, 1, lastRow - headerRow, lastCol).getValues();
+
+  for (let i = data.length - 1; i >= 0; i--) {
+    if (data[i][secondTenantIdx]) {
+      const snap = { tenant: data[i][secondTenantIdx] };
+      ['Rent', 'Bond Held', 'Internet', 'Water', 'Electricity', 'Gas'].forEach(function (label) {
+        const idx = headers.indexOf(label);
+        if (idx !== -1) snap[label] = data[i][idx];
+      });
+      return snap;
+    }
+  }
+  return null;
 }
 
 function sumField(rows, field) {
@@ -241,11 +463,9 @@ function allRows(ss, sheetName) {
 // ---------- helpers ----------
 
 /**
- * Las tres pestañas tienen filas en blanco / de definición (ej. "Room 1,
- * Small, 280...") ANTES de la fila real de encabezados — no está en la
- * fila 1 en ninguna de las tres. En vez de asumir un número de fila fijo
- * (frágil, y distinto según la pestaña), se busca la fila cuya primera
- * celda diga exactamente "Date": esa es la fila de encabezados real.
+ * Las tres pestañas originales tienen filas en blanco / de definición ANTES
+ * de la fila real de encabezados — no está en la fila 1 en ninguna de las
+ * tres. Se busca la fila cuya primera celda diga exactamente "Date".
  */
 function findHeaderRow(sheet) {
   const scanRows = Math.min(sheet.getLastRow(), 20);
@@ -272,8 +492,6 @@ function appendRow(ss, sheetName, valuesByHeader) {
   const lastCol = Math.max(sheet.getLastColumn(), 1);
   const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
 
-  // Normaliza la fecha que llega de la app (yyyy-mm-dd) al formato que usa
-  // esta pestaña en particular, para que quede igual que las filas vecinas.
   const values = Object.assign({}, valuesByHeader);
   if (values['Date']) {
     const fmt = DATE_FORMAT[sheetName] || 'dd/MM/yyyy';
@@ -310,9 +528,8 @@ function appendRow(ss, sheetName, valuesByHeader) {
   }
 
   // "Tenants" repite el encabezado "Tenant" dos veces (la segunda es parte
-  // de un resumen lateral por Room 2, no del registro de este pago) — solo
-  // se escribe en la PRIMERA columna que tenga cada nombre de encabezado,
-  // para no pisar ni duplicar en esa columna repetida.
+  // del resumen lateral de Room 2, no del registro de este pago) — solo se
+  // escribe en la PRIMERA columna que tenga cada nombre de encabezado.
   const seenWrite = {};
   const row = headers.map(function (h) {
     if (h && Object.prototype.hasOwnProperty.call(values, h) && !seenWrite[h]) {
@@ -327,7 +544,7 @@ function appendRow(ss, sheetName, valuesByHeader) {
 // "2026-08-04" (input type=date) -> "04/08/2026" o "04/08/26" según fmt.
 function formatIsoDate(isoStr, fmt) {
   const m = String(isoStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return isoStr; // no vino en el formato esperado, se deja tal cual
+  if (!m) return isoStr;
   const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
   return Utilities.formatDate(d, Session.getScriptTimeZone(), fmt);
 }
@@ -361,8 +578,8 @@ function lastRows(ss, sheetName, n) {
   return values.reverse().map(function (row) { return rowToObject(headers, row); });
 }
 
-// "Tenants" tiene el encabezado "Tenant" repetido (ver appendRow) — se
-// queda con la PRIMERA columna que tenga cada nombre, ignora la repetida.
+// Se queda con la PRIMERA columna que tenga cada nombre de encabezado
+// (necesario porque "Tenants" repite "Tenant" dos veces).
 function rowToObject(headers, row) {
   const obj = {};
   headers.forEach(function (h, i) {

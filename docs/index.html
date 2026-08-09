@@ -70,13 +70,14 @@
   main { max-width: 480px; margin: 0 auto; padding: 16px; }
 
   .tabs {
-    display: grid; grid-template-columns: repeat(4, 1fr);
-    gap: 6px; margin-bottom: 16px;
+    display: flex; gap: 6px; margin-bottom: 16px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
   }
+  .tabs::-webkit-scrollbar { display: none; }
   .tab {
-    padding: 10px 3px; text-align: center; font-size: 12.5px; font-weight: 600;
+    flex: 0 0 auto; padding: 10px 14px; text-align: center; font-size: 12.5px; font-weight: 600;
     border-radius: 9px; border: 1px solid var(--line); background: var(--card);
-    color: var(--ink-2); cursor: pointer;
+    color: var(--ink-2); cursor: pointer; white-space: nowrap;
   }
   .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
@@ -175,6 +176,35 @@
     font-size: 12px; color: var(--accent); text-align: right; margin-bottom: 12px; cursor: pointer; font-weight: 600;
   }
 
+  /* ---------- registro de arrendatarios ---------- */
+  input[type="file"] { padding: 9px; font-size: 13px; }
+  .file-status { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  .roommate-list { margin-top: 22px; }
+  .roommate-list h2 { font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 10px; }
+  .roommate-card {
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+    background: var(--card); cursor: pointer;
+  }
+  .roommate-card .head { display: flex; justify-content: space-between; align-items: baseline; }
+  .roommate-card .name { font-weight: 700; font-size: 14px; }
+  .roommate-card .room { font-size: 12px; color: var(--ink-2); }
+  .roommate-card .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .roommate-card .status-inactive { color: var(--muted); font-style: italic; }
+  .profile-docs { display: flex; gap: 8px; margin-top: 6px; }
+  .profile-docs a {
+    font-size: 11.5px; color: var(--accent); text-decoration: none; font-weight: 600;
+    border: 1px solid var(--line); border-radius: 100px; padding: 3px 9px;
+  }
+  .form-note { font-size: 11.5px; color: var(--muted); margin-top: -6px; }
+  button.secondary {
+    padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg);
+    color: var(--ink-2); font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .auto-note { font-size: 11px; color: var(--muted); margin-top: -4px; margin-bottom: 10px; }
+  .auto-row { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .auto-row .n { color: var(--ink-2); }
+  .auto-row .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+
   .overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none;
     align-items: flex-end; justify-content: center; z-index: 20;
@@ -235,6 +265,7 @@
     <div class="tab active" data-tab="expense">Gasto</div>
     <div class="tab" data-tab="tenant">Arriendo</div>
     <div class="tab" data-tab="landlord">Al dueño</div>
+    <div class="tab" data-tab="roommate">Arrendatarios</div>
     <div class="tab" data-tab="dashboard">Resumen</div>
   </div>
 
@@ -279,12 +310,12 @@
 
     <div class="split-box" id="splitBox">
       <div class="head">
-        <span>DIVIDIR CON INQUILINO</span>
+        <span>DIVIDIR CON QUIEN PAGA SERVICIOS</span>
         <label class="toggle-row"><input type="checkbox" id="autoSplit" checked> Activado</label>
       </div>
-      <div class="row2">
+      <div id="splitManual" class="row2" style="display:none">
         <div>
-          <label>Inquilino</label>
+          <label>Inquilino (registro vacío, ingrésalo a mano)</label>
           <input type="text" id="splitTenant" list="tenantList">
         </div>
         <div>
@@ -292,7 +323,11 @@
           <input type="number" id="splitPct" min="0" max="100" step="1">
         </div>
       </div>
-      <div class="split-preview">Se creará un cobro pendiente de <b id="splitAmountPreview">$0</b> para <span id="splitTenantPreview">—</span> en la hoja de Arriendo.</div>
+      <div id="splitAuto" style="display:none">
+        <label>% del total que corresponde a quienes pagan servicios</label>
+        <input type="number" id="splitPctAuto" min="0" max="100" step="1">
+      </div>
+      <div class="split-preview" id="splitPreviewText"></div>
     </div>
 
     <button type="submit" class="submit">Registrar gasto</button>
@@ -387,6 +422,78 @@
     <div class="banner" id="banner-landlord"></div>
   </form>
 
+  <!-- ROOMMATE -->
+  <form class="card" id="form-roommate">
+    <div class="form-note">Vuelve a guardar con el mismo nombre para editar una ficha existente.</div>
+    <div>
+      <label>Nombre</label>
+      <input type="text" name="name" id="rmName" required>
+    </div>
+    <div class="row2">
+      <div>
+        <label>Pieza</label>
+        <select name="room" id="rmRoom">
+          <option value="Pieza 1">Pieza 1 (chica, $280/sem)</option>
+          <option value="Pieza 2">Pieza 2 (grande, $390/sem)</option>
+        </select>
+      </div>
+      <div>
+        <label>Renta ($/semana)</label>
+        <input type="number" name="rent" id="rmRent" step="0.01" min="0">
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>Frecuencia de pago</label>
+        <select name="frequency" id="rmFrequency">
+          <option>Semanal</option>
+          <option>Quincenal</option>
+          <option>Mensual</option>
+        </select>
+      </div>
+      <div>
+        <label>Estado</label>
+        <select name="status" id="rmStatus">
+          <option>Activo</option>
+          <option>Inactivo</option>
+        </select>
+      </div>
+    </div>
+    <label class="toggle-row"><input type="checkbox" name="paysUtilities" id="rmPaysUtilities"> Paga servicios (luz/agua/gas/internet)</label>
+    <div class="row2">
+      <div>
+        <label>Bond — monto</label>
+        <input type="number" name="bondAmount" id="rmBondAmount" step="0.01" min="0">
+      </div>
+      <div>
+        <label>Bond — fecha</label>
+        <input type="date" name="bondDate" id="rmBondDate">
+      </div>
+    </div>
+    <div>
+      <label>Bond — detalle</label>
+      <input type="text" name="bondDetail" id="rmBondDetail" placeholder="Ej: 3 semanas de bond">
+    </div>
+    <div>
+      <label>Foto de ID</label>
+      <input type="file" accept="image/*" id="rmIdPhoto">
+      <div class="file-status" id="rmIdPhotoStatus"></div>
+    </div>
+    <div>
+      <label>Comprobante de ingreso</label>
+      <input type="file" accept="image/*,application/pdf" id="rmIncomeProof">
+      <div class="file-status" id="rmIncomeProofStatus"></div>
+    </div>
+    <button type="submit" class="submit">Guardar arrendatario</button>
+    <button type="button" class="secondary" id="rmClear">Limpiar formulario (nueva ficha)</button>
+    <div class="banner" id="banner-roommate"></div>
+
+    <div class="roommate-list">
+      <h2>Fichas guardadas</h2>
+      <div id="roommateList"><div class="recent-empty">Configura la conexión (⚙) para ver esto.</div></div>
+    </div>
+  </form>
+
   <!-- DASHBOARD -->
   <div class="card" id="form-dashboard">
     <div class="dash-refresh" id="dashRefresh">↻ Actualizar</div>
@@ -440,6 +547,7 @@
     document.body.classList.remove('locked');
     lockScreen.classList.add('hide');
     refreshRecent();
+    loadTenantsRegistry();
   }
   function tryUnlock() {
     if (lockInput.value === LOCK_PIN) {
@@ -502,6 +610,7 @@
       t.classList.add('active');
       document.getElementById('form-' + t.dataset.tab).classList.add('active');
       if (t.dataset.tab === 'dashboard') loadDashboard();
+      if (t.dataset.tab === 'roommate') loadRoommates();
     });
   });
 
@@ -509,35 +618,92 @@
   var today = new Date().toISOString().slice(0, 10);
   document.querySelectorAll('input[name="date"]').forEach(function (i) { i.value = today; });
 
+  // ---- registro de arrendatarios (compartido por varias secciones) ----
+  var tenantsRegistry = [];
+  var ROOM_DEFAULTS = { 'Pieza 1': { rent: 280, frequency: 'Mensual' }, 'Pieza 2': { rent: 390, frequency: 'Quincenal' } };
+
+  function loadTenantsRegistry() {
+    if (!cfg.url) return Promise.resolve([]);
+    var url = cfg.url + '?secret=' + encodeURIComponent(cfg.secret) + '&tenants=1';
+    return fetch(url).then(function (r) { return r.json(); }).then(function (res) {
+      tenantsRegistry = (res.ok && res.tenants) ? res.tenants : [];
+      populateTenantDatalist();
+      updateSplitUI();
+      return tenantsRegistry;
+    }).catch(function () { return []; });
+  }
+
+  function populateTenantDatalist() {
+    var dl = document.getElementById('tenantList');
+    var active = tenantsRegistry.filter(function (t) { return t['Estado'] === 'Activo'; });
+    dl.innerHTML = active.map(function (t) { return '<option value="' + t['Nombre'] + '">'; }).join('');
+  }
+
+  // Cuando escriben/eligen un inquilino conocido en la pestaña Arriendo,
+  // se autocompleta la pieza — evita tener que acordarse manualmente.
+  var tenantField = document.querySelector('#form-tenant input[name="tenant"]');
+  var roomField = document.querySelector('#form-tenant select[name="room"]');
+  tenantField.addEventListener('input', function () {
+    var match = tenantsRegistry.find(function (t) { return t['Nombre'] === tenantField.value; });
+    if (match && match['Pieza']) roomField.value = String(ROOM_TO_NUMBER_JS[match['Pieza']] || '');
+  });
+  var ROOM_TO_NUMBER_JS = { 'Pieza 1': '1', 'Pieza 2': '2' };
+
   // ---- expense split logic ----
   var SPLITTABLE = { Electricity: 0.5, Water: 0.5, Gas: 0.5, Internet: 0.5 };
   var expenseType = document.getElementById('expenseType');
   var splitBox = document.getElementById('splitBox');
+  var splitManual = document.getElementById('splitManual');
+  var splitAuto = document.getElementById('splitAuto');
   var splitTenant = document.getElementById('splitTenant');
   var splitPct = document.getElementById('splitPct');
+  var splitPctAuto = document.getElementById('splitPctAuto');
   var amountInput = document.querySelector('#form-expense input[name="amount"]');
+
+  function billPayers() {
+    return tenantsRegistry.filter(function (t) { return t['Estado'] === 'Activo' && t['Paga Servicios'] === 'Sí'; });
+  }
 
   function updateSplitUI() {
     var frac = SPLITTABLE[expenseType.value];
-    if (frac) {
-      splitBox.classList.add('show');
+    if (!frac) { splitBox.classList.remove('show'); return; }
+    splitBox.classList.add('show');
+    var payers = billPayers();
+    if (payers.length) {
+      splitAuto.style.display = 'block';
+      splitManual.style.display = 'none';
+      if (!splitPctAuto.value) splitPctAuto.value = Math.round(frac * 100);
+    } else {
+      splitAuto.style.display = 'none';
+      splitManual.style.display = 'grid';
       if (!splitPct.value) splitPct.value = Math.round(frac * 100);
       if (!splitTenant.value) splitTenant.value = cfg.defaultTenant || 'Juan Plata';
-    } else {
-      splitBox.classList.remove('show');
     }
     updateSplitPreview();
   }
+
   function updateSplitPreview() {
     var amt = Number(amountInput.value || 0);
-    var pct = Number(splitPct.value || 0);
-    var share = Math.round(amt * pct) / 100;
-    document.getElementById('splitAmountPreview').textContent = '$' + share.toFixed(2);
-    document.getElementById('splitTenantPreview').textContent = splitTenant.value || '—';
+    var payers = billPayers();
+    var text;
+    if (payers.length) {
+      var pct = Number(splitPctAuto.value || 0);
+      var totalShare = Math.round(amt * pct) / 100;
+      var perPayer = payers.length ? Math.round((totalShare / payers.length) * 100) / 100 : 0;
+      var names = payers.map(function (p) { return p['Nombre']; }).join(', ');
+      text = 'Se creará un cobro pendiente de $' + perPayer.toFixed(2) + ' para cada uno de: ' + names +
+             ' (total repartido: $' + totalShare.toFixed(2) + ').';
+    } else {
+      var pct2 = Number(splitPct.value || 0);
+      var share = Math.round(amt * pct2) / 100;
+      text = 'Se creará un cobro pendiente de $' + share.toFixed(2) + ' para ' + (splitTenant.value || '—') + '.';
+    }
+    document.getElementById('splitPreviewText').textContent = text;
   }
   expenseType.addEventListener('change', updateSplitUI);
   amountInput.addEventListener('input', updateSplitPreview);
   splitPct.addEventListener('input', updateSplitPreview);
+  splitPctAuto.addEventListener('input', updateSplitPreview);
   splitTenant.addEventListener('input', updateSplitPreview);
   updateSplitUI();
 
@@ -564,6 +730,7 @@
   document.getElementById('form-expense').addEventListener('submit', function (ev) {
     ev.preventDefault();
     var f = ev.target;
+    var usingAutoPayers = billPayers().length > 0;
     var payload = {
       action: 'addExpense',
       date: f.date.value,
@@ -572,9 +739,9 @@
       type: f.type.value,
       detail: f.detail.value,
       autoSplit: splitBox.classList.contains('show') ? document.getElementById('autoSplit').checked : false,
-      splitTenant: splitTenant.value,
-      splitPct: Number(splitPct.value || 0) / 100
+      splitPct: (usingAutoPayers ? Number(splitPctAuto.value || 0) : Number(splitPct.value || 0)) / 100
     };
+    if (!usingAutoPayers) payload.splitTenant = splitTenant.value;
     post(payload).then(function (res) {
       if (res.ok) {
         var extra = res.created.length > 1 ? ' + cobro pendiente creado' : '';
@@ -611,6 +778,132 @@
     }).catch(function (e) { showBanner('banner-landlord', false, String(e)); });
   });
 
+  // ---- registro de arrendatarios: formulario ----
+  var rmRoom = document.getElementById('rmRoom');
+  var rmRent = document.getElementById('rmRent');
+  var rmFrequency = document.getElementById('rmFrequency');
+  rmRoom.addEventListener('change', function () {
+    var def = ROOM_DEFAULTS[rmRoom.value];
+    if (def) { rmRent.value = def.rent; rmFrequency.value = def.frequency; }
+  });
+
+  // Redimensiona una imagen en el navegador antes de mandarla (fotos del
+  // celular pueden pesar varios MB) — máx 1200px de lado, JPEG calidad 0.8.
+  function fileToPayload(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) { resolve(null); return; }
+      if (!file.type.startsWith('image/')) {
+        // PDF u otro tipo no-imagen: se manda tal cual, sin redimensionar.
+        var reader = new FileReader();
+        reader.onload = function () {
+          resolve({ base64: reader.result.split(',')[1], mimeType: file.type, filename: file.name });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+        return;
+      }
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        var maxDim = 1200;
+        var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        resolve({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg', filename: file.name.replace(/\.[^.]+$/, '.jpg') });
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  document.getElementById('rmClear').addEventListener('click', function () {
+    document.getElementById('form-roommate').reset();
+    document.getElementById('rmIdPhotoStatus').textContent = '';
+    document.getElementById('rmIncomeProofStatus').textContent = '';
+  });
+
+  document.getElementById('form-roommate').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var idPhotoFile = document.getElementById('rmIdPhoto').files[0];
+    var incomeFile = document.getElementById('rmIncomeProof').files[0];
+    var statusId = document.getElementById('rmIdPhotoStatus');
+    var statusIncome = document.getElementById('rmIncomeProofStatus');
+    if (idPhotoFile) statusId.textContent = 'Subiendo…';
+    if (incomeFile) statusIncome.textContent = 'Subiendo…';
+
+    Promise.all([fileToPayload(idPhotoFile), fileToPayload(incomeFile)]).then(function (results) {
+      var payload = {
+        action: 'addTenantProfile',
+        name: document.getElementById('rmName').value,
+        room: rmRoom.value,
+        rent: rmRent.value,
+        frequency: rmFrequency.value,
+        status: document.getElementById('rmStatus').value,
+        paysUtilities: document.getElementById('rmPaysUtilities').checked,
+        bondAmount: document.getElementById('rmBondAmount').value,
+        bondDate: document.getElementById('rmBondDate').value,
+        bondDetail: document.getElementById('rmBondDetail').value
+      };
+      if (results[0]) payload.idPhoto = results[0];
+      if (results[1]) payload.incomeProof = results[1];
+      return post(payload);
+    }).then(function (res) {
+      if (res.ok) {
+        showBanner('banner-roommate', true, res.created[0].updated ? 'Ficha actualizada.' : 'Ficha guardada.');
+        statusId.textContent = idPhotoFile ? 'Subida ✓' : '';
+        statusIncome.textContent = incomeFile ? 'Subida ✓' : '';
+        loadTenantsRegistry();
+        loadRoommates();
+      } else {
+        showBanner('banner-roommate', false, res.error || 'Error');
+      }
+    }).catch(function (e) { showBanner('banner-roommate', false, String(e)); });
+  });
+
+  function loadRoommates() {
+    var list = document.getElementById('roommateList');
+    if (!cfg.url) { list.innerHTML = '<div class="recent-empty">Configura la conexión (⚙) para ver esto.</div>'; return; }
+    var url = cfg.url + '?secret=' + encodeURIComponent(cfg.secret) + '&tenants=1';
+    fetch(url).then(function (r) { return r.json(); }).then(function (res) {
+      if (!res.ok) { list.innerHTML = '<div class="recent-empty">' + (res.error || 'Error al cargar') + '</div>'; return; }
+      tenantsRegistry = res.tenants || [];
+      populateTenantDatalist();
+      if (!tenantsRegistry.length) { list.innerHTML = '<div class="recent-empty">Sin fichas todavía — usa el formulario de arriba.</div>'; return; }
+      list.innerHTML = tenantsRegistry.map(function (t, i) {
+        var inactive = t['Estado'] !== 'Activo';
+        var docs = '';
+        if (t['Foto ID']) docs += '<a href="' + t['Foto ID'] + '" target="_blank" rel="noopener">Ver ID</a>';
+        if (t['Comprobante Ingreso']) docs += '<a href="' + t['Comprobante Ingreso'] + '" target="_blank" rel="noopener">Ver ingreso</a>';
+        return '<div class="roommate-card" data-idx="' + i + '">' +
+          '<div class="head"><span class="name">' + t['Nombre'] + (inactive ? ' <span class="status-inactive">(inactivo)</span>' : '') + '</span><span class="room">' + (t['Pieza'] || '') + '</span></div>' +
+          '<div class="meta">$' + (t['Renta'] || '—') + '/semana · ' + (t['Frecuencia'] || '—') + ' · ' + (t['Paga Servicios'] === 'Sí' ? 'Paga servicios' : 'No paga servicios') +
+          (t['Bond Monto'] ? ' · Bond $' + t['Bond Monto'] : '') + '</div>' +
+          (docs ? '<div class="profile-docs">' + docs + '</div>' : '') +
+          '</div>';
+      }).join('');
+      list.querySelectorAll('.roommate-card').forEach(function (card) {
+        card.addEventListener('click', function (ev) {
+          if (ev.target.tagName === 'A') return; // no interceptar los links de documentos
+          var t = tenantsRegistry[Number(card.dataset.idx)];
+          document.getElementById('rmName').value = t['Nombre'] || '';
+          rmRoom.value = t['Pieza'] || 'Pieza 1';
+          rmRent.value = t['Renta'] || '';
+          rmFrequency.value = t['Frecuencia'] || '';
+          document.getElementById('rmStatus').value = t['Estado'] || 'Activo';
+          document.getElementById('rmPaysUtilities').checked = t['Paga Servicios'] === 'Sí';
+          document.getElementById('rmBondAmount').value = t['Bond Monto'] || '';
+          document.getElementById('rmBondDetail').value = t['Bond Detalle'] || '';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      });
+    }).catch(function () { list.innerHTML = '<div class="recent-empty">No se pudo conectar.</div>'; });
+  }
+
   // ---- recent activity ----
   function refreshRecent() {
     var list = document.getElementById('recentList');
@@ -631,7 +924,7 @@
       }).join('');
     }).catch(function () { list.innerHTML = '<div class="recent-empty">No se pudo conectar.</div>'; });
   }
-  if (sessionStorage.getItem(LOCK_KEY) === '1') { refreshRecent(); }
+  if (sessionStorage.getItem(LOCK_KEY) === '1') { refreshRecent(); loadTenantsRegistry(); }
 
   // ---- dashboard ----
   document.getElementById('dashRefresh').addEventListener('click', loadDashboard);
@@ -681,15 +974,44 @@
               barList(s.tenants.pendingByTenant, { color: 'var(--pending)' }) + '</div>';
     }
 
-    html += '<div class="dash-section"><h3>Por inquilino (pagado)<span class="tot">' + money(s.tenants.totalPaid) + '</span></h3>';
-    var tenants = Object.keys(s.tenants.byTypePerTenant);
-    if (!tenants.length) {
+    html += '<div class="dash-section"><h3>Por pieza</h3>';
+    var rooms = Object.keys(s.byRoom || {});
+    if (!rooms.length) {
       html += '<div class="dash-empty">Sin pagos registrados todavía.</div>';
     } else {
-      tenants.sort(function (a, b) { return (s.tenants.paidByTenant[b] || 0) - (s.tenants.paidByTenant[a] || 0); });
-      tenants.forEach(function (t) {
+      rooms.sort(function (a, b) { return (s.byRoom[b].total || 0) - (s.byRoom[a].total || 0); });
+      rooms.forEach(function (r) {
+        var room = s.byRoom[r];
+        html += '<div class="tenant-card"><div class="head"><span class="name">' + r + '</span><span class="paid">' + money(room.total) + '</span></div>' +
+          '<div class="breakdown">' + Object.keys(room.byType).map(function (ty) {
+            return '<span class="chip">' + ty + ' ' + money(room.byType[ty]) + '</span>';
+          }).join('') + '</div></div>';
+      });
+      if (rooms.indexOf('Sin pieza asignada') !== -1) {
+        html += '<div class="auto-note">"Sin pieza asignada" son movimientos antiguos que no tenían la columna Room llena en la planilla.</div>';
+      }
+    }
+    html += '</div>';
+
+    html += '<div class="dash-section"><h3>Por inquilino (pagado)<span class="tot">' + money(s.tenants.totalPaid) + '</span></h3>';
+    var tenantNames = Object.keys(s.tenants.byTypePerTenant);
+    if (!tenantNames.length) {
+      html += '<div class="dash-empty">Sin pagos registrados todavía.</div>';
+    } else {
+      tenantNames.sort(function (a, b) { return (s.tenants.paidByTenant[b] || 0) - (s.tenants.paidByTenant[a] || 0); });
+      tenantNames.forEach(function (t) {
         var pending = s.tenants.pendingByTenant[t] || 0;
+        var profile = (s.registry || []).find(function (r) { return r['Nombre'] === t; });
         html += '<div class="tenant-card"><div class="head"><span class="name">' + t + '</span><span class="paid">' + money(s.tenants.paidByTenant[t] || 0) + '</span></div>';
+        if (profile) {
+          html += '<div class="meta" style="margin-bottom:6px">' + profile['Pieza'] + ' · $' + profile['Renta'] + '/semana · ' + profile['Frecuencia'] +
+            ' · ' + (profile['Paga Servicios'] === 'Sí' ? 'paga servicios' : 'no paga servicios') +
+            (profile['Bond Monto'] ? ' · Bond $' + profile['Bond Monto'] + (profile['Bond Fecha'] ? ' (' + profile['Bond Fecha'] + ')' : '') : '') + '</div>';
+          var docs = '';
+          if (profile['Foto ID']) docs += '<a href="' + profile['Foto ID'] + '" target="_blank" rel="noopener">Ver ID</a>';
+          if (profile['Comprobante Ingreso']) docs += '<a href="' + profile['Comprobante Ingreso'] + '" target="_blank" rel="noopener">Ver ingreso</a>';
+          if (docs) html += '<div class="profile-docs" style="margin-bottom:6px">' + docs + '</div>';
+        }
         if (pending > 0) html += '<div class="pending-line">Pendiente: ' + money(pending) + '</div>';
         var byType = s.tenants.byTypePerTenant[t];
         html += '<div class="breakdown">' + Object.keys(byType).map(function (ty) {
@@ -704,6 +1026,23 @@
     html += '<div class="dash-section"><h3>Gastado en la casa<span class="tot">' + money(s.expenses.total) + '</span></h3>' + barList(s.expenses.byType) + '</div>';
 
     html += '<div class="dash-section"><h3>Pagado al arrendador<span class="tot">' + money(s.landlord.total) + '</span></h3>' + barList(s.landlord.byType, { color: 'var(--bad)' }) + '</div>';
+
+    var auto = s.autoTotals || {};
+    if (auto.expenses && Object.keys(auto.expenses).length) {
+      html += '<div class="dash-section"><h3>Totales de tu Excel (tal cual)</h3>' +
+        '<div class="auto-note">Estos valores se leen directo de las celdas de tu planilla, no se recalculan aquí.</div>' +
+        Object.keys(auto.expenses).map(function (k) {
+          return '<div class="auto-row"><span class="n">' + k + '</span><span class="v">' + money(auto.expenses[k]) + '</span></div>';
+        }).join('') + '</div>';
+    }
+    if (auto.tenantsSideSnapshot) {
+      var snap = auto.tenantsSideSnapshot;
+      html += '<div class="dash-section"><h3>Resumen anotado en Tenants (Room 2)</h3>' +
+        '<div class="auto-note">Última fila con datos en las columnas Rent/Bond Held/etc. — ' + snap.tenant + '.</div>' +
+        Object.keys(snap).filter(function (k) { return k !== 'tenant'; }).map(function (k) {
+          return '<div class="auto-row"><span class="n">' + k + '</span><span class="v">' + money(snap[k]) + '</span></div>';
+        }).join('') + '</div>';
+    }
 
     el.innerHTML = html;
   }
