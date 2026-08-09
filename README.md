@@ -15,6 +15,10 @@ Si registras un gasto de tipo **Electricity, Water, Gas o Internet**, la app cal
 
 No toca ni recalcula las columnas de totales acumulados que ya existen en la planilla (Rent/Bond Held/Internet/Water/Electricity/Gas por inquilino) — solo agrega filas nuevas usando las columnas de cada pestaña. Si en algún momento quieres que esos totales se actualicen solos, lo mejor es convertirlos a fórmulas (`SUMIF`/`SUMIFS`) dentro de la misma planilla — pídemelo y te lo dejo armado.
 
+## Privacidad
+
+La app pide un **PIN** (6 dígitos) antes de mostrar nada — evita que alguien que encuentre el link por casualidad la abra y la use. No es seguridad fuerte (el PIN vive en el código de la página, visible para quien sepa mirarlo), es solo una barrera contra el acceso casual. Para que esto funcione, la implementación de Apps Script debe seguir con acceso **"Cualquier usuario"** (no "Solo yo") — la privacidad la da el PIN del frontend, no el login de Google.
+
 ## Puesta en marcha (resumen)
 
 1. Despliega el backend — ver [`apps-script/README.md`](./apps-script/README.md).
