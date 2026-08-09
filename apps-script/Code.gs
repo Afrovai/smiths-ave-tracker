@@ -235,11 +235,7 @@ function allRows(ss, sheetName) {
   const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
   if (lastRow <= headerRow) return [];
   const values = sheet.getRange(headerRow + 1, 1, lastRow - headerRow, lastCol).getValues();
-  return values.map(function (row) {
-    const obj = {};
-    headers.forEach(function (h, i) { if (h) obj[h] = row[i]; });
-    return obj;
-  });
+  return values.map(function (row) { return rowToObject(headers, row); });
 }
 
 // ---------- helpers ----------
@@ -300,8 +296,10 @@ function appendRow(ss, sheetName, valuesByHeader) {
         const amountEmpty = body[i][amountColIdx] === '' || body[i][amountColIdx] === null;
         if (wanted && cellDate === wanted && amountEmpty) {
           const targetRow = headerRow + 1 + i;
+          const seenFill = {};
           headers.forEach(function (h, c) {
-            if (h && Object.prototype.hasOwnProperty.call(values, h)) {
+            if (h && Object.prototype.hasOwnProperty.call(values, h) && !seenFill[h]) {
+              seenFill[h] = true;
               sheet.getRange(targetRow, c + 1).setValue(values[h]);
             }
           });
@@ -311,8 +309,17 @@ function appendRow(ss, sheetName, valuesByHeader) {
     }
   }
 
+  // "Tenants" repite el encabezado "Tenant" dos veces (la segunda es parte
+  // de un resumen lateral por Room 2, no del registro de este pago) — solo
+  // se escribe en la PRIMERA columna que tenga cada nombre de encabezado,
+  // para no pisar ni duplicar en esa columna repetida.
+  const seenWrite = {};
   const row = headers.map(function (h) {
-    return Object.prototype.hasOwnProperty.call(values, h) ? values[h] : '';
+    if (h && Object.prototype.hasOwnProperty.call(values, h) && !seenWrite[h]) {
+      seenWrite[h] = true;
+      return values[h];
+    }
+    return '';
   });
   sheet.appendRow(row);
 }
@@ -351,11 +358,17 @@ function lastRows(ss, sheetName, n) {
   if (lastRow <= headerRow) return [];
   const startRow = Math.max(headerRow + 1, lastRow - n + 1);
   const values = sheet.getRange(startRow, 1, lastRow - startRow + 1, lastCol).getValues();
-  return values.reverse().map(function (row) {
-    const obj = {};
-    headers.forEach(function (h, i) { if (h) obj[h] = row[i]; });
-    return obj;
+  return values.reverse().map(function (row) { return rowToObject(headers, row); });
+}
+
+// "Tenants" tiene el encabezado "Tenant" repetido (ver appendRow) — se
+// queda con la PRIMERA columna que tenga cada nombre, ignora la repetida.
+function rowToObject(headers, row) {
+  const obj = {};
+  headers.forEach(function (h, i) {
+    if (h && !(h in obj)) obj[h] = row[i];
   });
+  return obj;
 }
 
 function requireFields(body, fields) {
