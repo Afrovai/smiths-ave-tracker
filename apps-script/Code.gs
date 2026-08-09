@@ -134,11 +134,29 @@ function doGet(e) {
 
 // ---------- helpers ----------
 
+/**
+ * Las tres pestañas tienen filas en blanco / de definición (ej. "Room 1,
+ * Small, 280...") ANTES de la fila real de encabezados — no está en la
+ * fila 1 en ninguna de las tres. En vez de asumir un número de fila fijo
+ * (frágil, y distinto según la pestaña), se busca la fila cuya primera
+ * celda diga exactamente "Date": esa es la fila de encabezados real.
+ */
+function findHeaderRow(sheet) {
+  const scanRows = Math.min(sheet.getLastRow(), 20);
+  if (scanRows < 1) throw new Error('Pestaña vacía: ' + sheet.getName());
+  const colA = sheet.getRange(1, 1, scanRows, 1).getValues();
+  for (let i = 0; i < colA.length; i++) {
+    if (String(colA[i][0]).trim() === 'Date') return i + 1; // 1-indexado
+  }
+  throw new Error('No se encontró la fila de encabezados ("Date" en columna A) en ' + sheet.getName());
+}
+
 function appendRow(ss, sheetName, valuesByHeader) {
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error('No existe la pestaña: ' + sheetName);
+  const headerRow = findHeaderRow(sheet);
   const lastCol = Math.max(sheet.getLastColumn(), 1);
-  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
   const row = headers.map(function (h) {
     return Object.prototype.hasOwnProperty.call(valuesByHeader, h) ? valuesByHeader[h] : '';
   });
@@ -148,11 +166,12 @@ function appendRow(ss, sheetName, valuesByHeader) {
 function lastRows(ss, sheetName, n) {
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return [];
+  const headerRow = findHeaderRow(sheet);
   const lastRow = sheet.getLastRow();
   const lastCol = Math.max(sheet.getLastColumn(), 1);
-  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  const startRow = Math.max(2, lastRow - n + 1);
-  if (lastRow < 2) return [];
+  const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
+  if (lastRow <= headerRow) return [];
+  const startRow = Math.max(headerRow + 1, lastRow - n + 1);
   const values = sheet.getRange(startRow, 1, lastRow - startRow + 1, lastCol).getValues();
   return values.reverse().map(function (row) {
     const obj = {};
