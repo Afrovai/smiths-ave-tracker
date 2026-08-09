@@ -380,6 +380,11 @@ function computeSummary(ss) {
 // celda, el valor en la celda inmediatamente a la derecha) para las
 // etiquetas dadas — así encuentra los totales automáticos de "Expenses"
 // sin depender de en qué columna exacta estén.
+//
+// Ojo: "House"/"Internet"/"Water"/etc. también aparecen como texto en la
+// columna "Type" de cada gasto, con el Detalle (texto) al lado — para no
+// confundir eso con el total real, solo cuenta como match si la celda de
+// al lado es un NÚMERO (el total real lo es; el detalle de un gasto no).
 function readSideTotals(sheet, labels) {
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
@@ -389,7 +394,7 @@ function readSideTotals(sheet, labels) {
   for (let r = 0; r < grid.length; r++) {
     for (let c = 0; c < grid[r].length - 1; c++) {
       const label = String(grid[r][c]).trim();
-      if (labels.indexOf(label) !== -1 && grid[r][c + 1] !== '') {
+      if (labels.indexOf(label) !== -1 && typeof grid[r][c + 1] === 'number') {
         out[label] = grid[r][c + 1];
       }
     }
