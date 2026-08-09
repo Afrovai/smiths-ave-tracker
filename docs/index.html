@@ -70,11 +70,11 @@
   main { max-width: 480px; margin: 0 auto; padding: 16px; }
 
   .tabs {
-    display: grid; grid-template-columns: repeat(3, 1fr);
+    display: grid; grid-template-columns: repeat(4, 1fr);
     gap: 6px; margin-bottom: 16px;
   }
   .tab {
-    padding: 10px 4px; text-align: center; font-size: 13px; font-weight: 600;
+    padding: 10px 3px; text-align: center; font-size: 12.5px; font-weight: 600;
     border-radius: 9px; border: 1px solid var(--line); background: var(--card);
     color: var(--ink-2); cursor: pointer;
   }
@@ -130,6 +130,50 @@
   .recent-item .r { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
   .recent-item .r.pending { color: var(--pending); }
   .recent-empty { font-size: 13px; color: var(--muted); padding: 6px 0; }
+
+  /* ---------- dashboard ---------- */
+  .dash-loading, .dash-empty { font-size: 13px; color: var(--muted); padding: 10px 0; }
+  .dash-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 18px;
+  }
+  .dash-stat {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 10px; display: flex; flex-direction: column; gap: 3px;
+  }
+  .dash-stat .l { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+  .dash-stat .v { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .dash-stat .v.pos { color: var(--good); }
+  .dash-stat .v.neg { color: var(--bad); }
+
+  .dash-section { margin-bottom: 20px; }
+  .dash-section h3 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
+    margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .dash-section h3 .tot { color: var(--ink); font-size: 13px; font-weight: 700; text-transform: none; letter-spacing: 0; }
+
+  .bar-row { margin-bottom: 9px; }
+  .bar-row .top { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; }
+  .bar-row .top .name { color: var(--ink-2); }
+  .bar-row .top .amt { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .bar-track { height: 7px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; background: var(--accent); }
+
+  .tenant-card {
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--bg);
+  }
+  .tenant-card .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .tenant-card .name { font-weight: 700; font-size: 14px; }
+  .tenant-card .paid { font-size: 14px; font-weight: 700; color: var(--good); font-variant-numeric: tabular-nums; }
+  .tenant-card .pending-line { font-size: 12.5px; color: var(--pending); margin-bottom: 6px; }
+  .tenant-card .breakdown { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tenant-card .chip {
+    font-size: 11px; padding: 3px 8px; border-radius: 100px; background: var(--card);
+    border: 1px solid var(--line); color: var(--ink-2); font-variant-numeric: tabular-nums;
+  }
+  .dash-refresh {
+    font-size: 12px; color: var(--accent); text-align: right; margin-bottom: 12px; cursor: pointer; font-weight: 600;
+  }
 
   .overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none;
@@ -191,6 +235,7 @@
     <div class="tab active" data-tab="expense">Gasto</div>
     <div class="tab" data-tab="tenant">Arriendo</div>
     <div class="tab" data-tab="landlord">Al dueño</div>
+    <div class="tab" data-tab="dashboard">Resumen</div>
   </div>
 
   <!-- EXPENSE -->
@@ -342,6 +387,12 @@
     <div class="banner" id="banner-landlord"></div>
   </form>
 
+  <!-- DASHBOARD -->
+  <div class="card" id="form-dashboard">
+    <div class="dash-refresh" id="dashRefresh">↻ Actualizar</div>
+    <div id="dashContent"><div class="dash-loading">Cargando…</div></div>
+  </div>
+
   <datalist id="tenantList">
     <option value="Juan Plata">
     <option value="Nury">
@@ -450,6 +501,7 @@
       cards.forEach(function (x) { x.classList.remove('active'); });
       t.classList.add('active');
       document.getElementById('form-' + t.dataset.tab).classList.add('active');
+      if (t.dataset.tab === 'dashboard') loadDashboard();
     });
   });
 
@@ -580,6 +632,81 @@
     }).catch(function () { list.innerHTML = '<div class="recent-empty">No se pudo conectar.</div>'; });
   }
   if (sessionStorage.getItem(LOCK_KEY) === '1') { refreshRecent(); }
+
+  // ---- dashboard ----
+  document.getElementById('dashRefresh').addEventListener('click', loadDashboard);
+
+  function money(n) {
+    n = Number(n) || 0;
+    return (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('es-CL', { maximumFractionDigits: 2 });
+  }
+
+  function loadDashboard() {
+    var el = document.getElementById('dashContent');
+    if (!cfg.url) { el.innerHTML = '<div class="dash-empty">Configura la conexión (⚙) primero.</div>'; return; }
+    el.innerHTML = '<div class="dash-loading">Cargando…</div>';
+    var url = cfg.url + '?secret=' + encodeURIComponent(cfg.secret) + '&summary=1';
+    fetch(url).then(function (r) { return r.json(); }).then(function (res) {
+      if (!res.ok) { el.innerHTML = '<div class="dash-empty">' + (res.error || 'Error al cargar') + '</div>'; return; }
+      renderDashboard(res.summary);
+    }).catch(function () { el.innerHTML = '<div class="dash-empty">No se pudo conectar.</div>'; });
+  }
+
+  function barList(obj, opts) {
+    opts = opts || {};
+    var entries = Object.keys(obj).map(function (k) { return [k, obj[k]]; }).filter(function (e) { return e[1] !== 0; });
+    entries.sort(function (a, b) { return b[1] - a[1]; });
+    if (!entries.length) return '<div class="dash-empty">Sin movimientos.</div>';
+    var max = Math.max.apply(null, entries.map(function (e) { return Math.abs(e[1]); }));
+    return entries.map(function (e) {
+      var pct = max ? Math.max(4, Math.round(Math.abs(e[1]) / max * 100)) : 0;
+      return '<div class="bar-row"><div class="top"><span class="name">' + e[0] + '</span><span class="amt">' + money(e[1]) + '</span></div>' +
+             '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%; background:' + (opts.color || 'var(--accent)') + '"></div></div></div>';
+    }).join('');
+  }
+
+  function renderDashboard(s) {
+    var el = document.getElementById('dashContent');
+    var bp = s.bigPicture;
+    var html = '';
+
+    html += '<div class="dash-stats">' +
+      '<div class="dash-stat"><span class="l">Cobrado a inquilinos</span><span class="v">' + money(bp.cobradoATenants) + '</span></div>' +
+      '<div class="dash-stat"><span class="l">Pagado + gastado</span><span class="v">' + money(bp.pagadoALandlord + bp.gastadoEnCasa) + '</span></div>' +
+      '<div class="dash-stat"><span class="l">Margen neto</span><span class="v ' + (bp.margenNeto >= 0 ? 'pos' : 'neg') + '">' + money(bp.margenNeto) + '</span></div>' +
+      '</div>';
+
+    if (s.tenants.totalPending > 0) {
+      html += '<div class="dash-section"><h3>Pendiente por cobrar<span class="tot" style="color:var(--pending)">' + money(s.tenants.totalPending) + '</span></h3>' +
+              barList(s.tenants.pendingByTenant, { color: 'var(--pending)' }) + '</div>';
+    }
+
+    html += '<div class="dash-section"><h3>Por inquilino (pagado)<span class="tot">' + money(s.tenants.totalPaid) + '</span></h3>';
+    var tenants = Object.keys(s.tenants.byTypePerTenant);
+    if (!tenants.length) {
+      html += '<div class="dash-empty">Sin pagos registrados todavía.</div>';
+    } else {
+      tenants.sort(function (a, b) { return (s.tenants.paidByTenant[b] || 0) - (s.tenants.paidByTenant[a] || 0); });
+      tenants.forEach(function (t) {
+        var pending = s.tenants.pendingByTenant[t] || 0;
+        html += '<div class="tenant-card"><div class="head"><span class="name">' + t + '</span><span class="paid">' + money(s.tenants.paidByTenant[t] || 0) + '</span></div>';
+        if (pending > 0) html += '<div class="pending-line">Pendiente: ' + money(pending) + '</div>';
+        var byType = s.tenants.byTypePerTenant[t];
+        html += '<div class="breakdown">' + Object.keys(byType).map(function (ty) {
+          return '<span class="chip">' + ty + ' ' + money(byType[ty]) + '</span>';
+        }).join('') + '</div></div>';
+      });
+    }
+    html += '</div>';
+
+    html += '<div class="dash-section"><h3>Servicios cobrados a inquilinos</h3>' + barList(s.utilityChargedToTenants, { color: 'var(--s-2, var(--accent))' }) + '</div>';
+
+    html += '<div class="dash-section"><h3>Gastado en la casa<span class="tot">' + money(s.expenses.total) + '</span></h3>' + barList(s.expenses.byType) + '</div>';
+
+    html += '<div class="dash-section"><h3>Pagado al arrendador<span class="tot">' + money(s.landlord.total) + '</span></h3>' + barList(s.landlord.byType, { color: 'var(--bad)' }) + '</div>';
+
+    el.innerHTML = html;
+  }
 })();
 </script>
 </body>

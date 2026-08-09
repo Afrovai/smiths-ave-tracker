@@ -117,16 +117,21 @@ function doPost(e) {
 }
 
 /**
- * GET ?secret=...&recent=5  -> últimas filas de cada pestaña, para que la
- * app muestre "actividad reciente" y sirva de confirmación visual.
+ * GET ?secret=...&recent=5        -> últimas filas de cada pestaña.
+ * GET ?secret=...&summary=1       -> totales agregados para el dashboard.
  */
 function doGet(e) {
   try {
     const secret = e.parameter.secret;
     if (secret !== SECRET) return jsonOut({ ok: false, error: 'No autorizado' });
 
-    const n = Number(e.parameter.recent || 5);
     const ss = SpreadsheetApp.openById(SHEET_ID);
+
+    if (e.parameter.summary) {
+      return jsonOut({ ok: true, summary: computeSummary(ss) });
+    }
+
+    const n = Number(e.parameter.recent || 5);
     const out = {};
     ['Expenses', 'Tenants', 'To Landlord'].forEach(function (name) {
       out[name] = lastRows(ss, name, n);
@@ -135,6 +140,106 @@ function doGet(e) {
   } catch (err) {
     return jsonOut({ ok: false, error: String(err) });
   }
+}
+
+/**
+ * Junta todos los movimientos reales (sin las filas futuras vacías de
+ * "To Landlord") y arma los totales para el dashboard: cuánto se le ha
+ * pagado al arrendador, cuánto se ha gastado en la casa (por tipo), y
+ * cuánto ha pagado/debe cada inquilino (por tipo, y separando lo ya
+ * cobrado de lo pendiente).
+ */
+function computeSummary(ss) {
+  const expenses = allRows(ss, 'Expenses').filter(function (r) { return r['Amount'] !== '' && r['Amount'] != null; });
+  const tenantRows = allRows(ss, 'Tenants').filter(function (r) { return r['Amount'] !== '' && r['Amount'] != null; });
+  const landlordRows = allRows(ss, 'To Landlord').filter(function (r) { return r['Amount'] !== '' && r['Amount'] != null; });
+
+  const expenseTotal = sumField(expenses, 'Amount');
+  const expenseByType = sumByKey(expenses, 'Type', 'Amount');
+
+  const landlordTotal = sumField(landlordRows, 'Amount');
+  const landlordByType = sumByKey(landlordRows, 'Type', 'Amount');
+
+  const paidByTenant = {};
+  const pendingByTenant = {};
+  const byTypePerTenant = {};
+  const utilityChargedToTenants = { Internet: 0, Water: 0, Electricity: 0, Gas: 0 };
+
+  tenantRows.forEach(function (r) {
+    const tenant = r['Tenant'];
+    const amt = Number(r['Amount']) || 0;
+    const type = r['Type'] || 'Other';
+    const isPending = r['Payment Method'] === 'Pending';
+
+    if (tenant) {
+      if (isPending) {
+        pendingByTenant[tenant] = round2((pendingByTenant[tenant] || 0) + amt);
+      } else {
+        paidByTenant[tenant] = round2((paidByTenant[tenant] || 0) + amt);
+      }
+      byTypePerTenant[tenant] = byTypePerTenant[tenant] || {};
+      byTypePerTenant[tenant][type] = round2((byTypePerTenant[tenant][type] || 0) + amt);
+    }
+
+    if (utilityChargedToTenants.hasOwnProperty(type)) {
+      utilityChargedToTenants[type] = round2(utilityChargedToTenants[type] + amt);
+    }
+  });
+
+  const totalPaidByTenants = round2(sumValues(paidByTenant));
+  const totalPendingFromTenants = round2(sumValues(pendingByTenant));
+
+  return {
+    landlord: { total: round2(landlordTotal), byType: landlordByType },
+    expenses: { total: round2(expenseTotal), byType: expenseByType },
+    tenants: {
+      paidByTenant: paidByTenant,
+      pendingByTenant: pendingByTenant,
+      byTypePerTenant: byTypePerTenant,
+      totalPaid: totalPaidByTenants,
+      totalPending: totalPendingFromTenants
+    },
+    utilityChargedToTenants: utilityChargedToTenants,
+    bigPicture: {
+      cobradoATenants: totalPaidByTenants,
+      pagadoALandlord: round2(landlordTotal),
+      gastadoEnCasa: round2(expenseTotal),
+      margenNeto: round2(totalPaidByTenants - landlordTotal - expenseTotal)
+    }
+  };
+}
+
+function sumField(rows, field) {
+  return rows.reduce(function (s, r) { return s + (Number(r[field]) || 0); }, 0);
+}
+
+function sumByKey(rows, keyField, valField) {
+  const out = {};
+  rows.forEach(function (r) {
+    const k = r[keyField] || 'Other';
+    out[k] = round2((out[k] || 0) + (Number(r[valField]) || 0));
+  });
+  return out;
+}
+
+function sumValues(obj) {
+  return Object.keys(obj).reduce(function (s, k) { return s + obj[k]; }, 0);
+}
+
+function allRows(ss, sheetName) {
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return [];
+  const headerRow = findHeaderRow(sheet);
+  const lastRow = sheet.getLastRow();
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
+  if (lastRow <= headerRow) return [];
+  const values = sheet.getRange(headerRow + 1, 1, lastRow - headerRow, lastCol).getValues();
+  return values.map(function (row) {
+    const obj = {};
+    headers.forEach(function (h, i) { if (h) obj[h] = row[i]; });
+    return obj;
+  });
 }
 
 // ---------- helpers ----------
