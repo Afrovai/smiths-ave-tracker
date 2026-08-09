@@ -1,0 +1,151 @@
+'use strict';
+// Pruebas con datos SINTÉTICOS (nombres/montos inventados) — seguras para
+// un repo público. Para probar contra tus datos reales, ver
+// test-real-data.js (no está en git, ver .gitignore).
+const { MockSpreadsheet, buildSandbox, loadCode } = require('./mock-gas');
+
+let pass = 0, fail = 0;
+function check(label, cond, extra) {
+  if (cond) { pass++; console.log('  OK   ' + label); }
+  else { fail++; console.log('  FAIL ' + label + (extra !== undefined ? '  -> ' + JSON.stringify(extra) : '')); }
+}
+function section(title) { console.log('\n== ' + title + ' =='); }
+
+// Reproduce a propósito las mismas rarezas estructurales de la planilla
+// real: filas en blanco antes del encabezado, encabezado "Tenant" repetido
+// dos veces en Tenants, y una fila futura sin monto en To Landlord.
+function syntheticTenants() {
+  return [
+    [],
+    ['Room 1', 'Small', 280, 'Single'],
+    ['Room 2', 'Big', 390, 'Couple'],
+    [],
+    ['Date', 'Day Rent', 'Amount', 'Payment Method', 'Type', 'Detail', 'Room', 'Tenant', '', 'Tenant', 'Rent', 'Bond Held', 'Internet', 'Water', 'Electricity', 'Gas'],
+    [new Date(2026, 0, 5), 'Monday', 200, 'Transfer', 'Rent', 'semana 1', 1, 'Ana Test', '', 'Ana Test', 200, 0, 0, 0, 0, 0],
+    [new Date(2026, 0, 12), 'Monday', 300, 'Transfer', 'Rent', 'semana 2', 2, 'Beto Test', '', '', '', '', '', '', '', '']
+  ];
+}
+function syntheticLandlord() {
+  return [
+    [],
+    ['Date', 'Day', 'Amount', 'Payment Method', 'Type', 'Detail'],
+    [new Date(2026, 0, 1), 'Thursday', 500, 'Transfer', 'Rent', 'semana 1'],
+    [new Date(2026, 0, 15), '', '', '', '', ''] // fila futura precargada, sin monto
+  ];
+}
+function syntheticExpenses() {
+  return [
+    [],
+    ['Date', 'Amount', 'Payment Method', 'Type', 'Detail', '', 'House', 100],
+    [new Date(2026, 0, 3), 100, 'Card', 'House', 'artículos de cocina']
+  ];
+}
+
+function freshSandbox() {
+  const ss = new MockSpreadsheet();
+  ss._seed('Tenants', syntheticTenants());
+  ss._seed('To Landlord', syntheticLandlord());
+  ss._seed('Expenses', syntheticExpenses());
+  const sandbox = loadCode(buildSandbox(ss));
+  return { ss, sandbox };
+}
+
+function callDoGet(sandbox, params) {
+  return JSON.parse(sandbox.doGet({ parameter: params }).getContent());
+}
+function callDoPost(sandbox, body) {
+  return JSON.parse(sandbox.doPost({ postData: { contents: JSON.stringify(body) } }).getContent());
+}
+
+const SECRET = '5EGVxQhUJ2RsQ10dFUEkHAuM';
+
+// ---------------------------------------------------------------
+section('1. Resumen contra datos sintéticos');
+{
+  const { sandbox } = freshSandbox();
+  const res = callDoGet(sandbox, { secret: SECRET, summary: '1' });
+  check('ok:true', res.ok === true, res);
+  check('Ana Test pagó 200', res.summary.tenants.paidByTenant['Ana Test'] === 200);
+  check('Beto Test pagó 300', res.summary.tenants.paidByTenant['Beto Test'] === 300);
+  check('auto total House es número (100)', res.summary.autoTotals.expenses.House === 100);
+  check('Pieza 1 total 200', res.summary.byRoom['Pieza 1'].total === 200);
+  check('Pieza 2 total 300', res.summary.byRoom['Pieza 2'].total === 300);
+}
+
+// ---------------------------------------------------------------
+section('2. Registro de arrendatarios: crear, editar (upsert), no duplicar');
+{
+  const { ss, sandbox } = freshSandbox();
+  check('pestaña Arrendatarios no existe todavía', ss.getSheetByName('Arrendatarios') === null);
+
+  const r1 = callDoPost(sandbox, { secret: SECRET, action: 'addTenantProfile', name: 'Carla Test', room: 'Pieza 2', paysUtilities: true, bondAmount: 500 });
+  check('primera ficha: ok', r1.ok === true, r1);
+  check('primera ficha: updated=false (creación)', r1.created[0].updated === false);
+  check('pestaña Arrendatarios se creó sola', ss.getSheetByName('Arrendatarios') !== null);
+
+  const r2 = callDoPost(sandbox, { secret: SECRET, action: 'addTenantProfile', name: 'Carla Test', room: 'Pieza 2', paysUtilities: true, rent: 450 });
+  check('segunda vez mismo nombre: updated=true (edición)', r2.created[0].updated === true);
+  check('sigue habiendo solo 1 fila (no duplicó)', ss.getSheetByName('Arrendatarios').getLastRow() === 2);
+
+  const listed = callDoGet(sandbox, { secret: SECRET, tenants: '1' });
+  check('la renta editada quedó guardada (450)', listed.tenants[0]['Renta'] === 450, listed.tenants[0]);
+}
+
+// ---------------------------------------------------------------
+section('3. Subida de archivo (foto de ID) — no toca Drive real, solo el mock');
+{
+  const { sandbox } = freshSandbox();
+  const tinyPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+  const res = callDoPost(sandbox, {
+    secret: SECRET, action: 'addTenantProfile', name: 'Dana Test', room: 'Pieza 1', paysUtilities: false,
+    idPhoto: { base64: tinyPngBase64, mimeType: 'image/png', filename: 'id.png' }
+  });
+  check('ok', res.ok === true, res);
+  const listed = callDoGet(sandbox, { secret: SECRET, tenants: '1' });
+  const foto = listed.tenants[0]['Foto ID'];
+  check('quedó guardado un link de Drive (mock) en Foto ID', typeof foto === 'string' && foto.indexOf('drive.google.com/mock') !== -1, foto);
+  check('DriveApp.createFile se llamó una vez', sandbox.__driveLog.length === 1, sandbox.__driveLog);
+}
+
+// ---------------------------------------------------------------
+section('4. División de cuenta compartida — con y sin gente en el registro');
+{
+  const { sandbox } = freshSandbox();
+
+  const r1 = callDoPost(sandbox, { secret: SECRET, action: 'addExpense', date: '2026-08-09', amount: 200, type: 'Electricity' });
+  check('4a ok (fallback sin registro)', r1.ok === true, r1);
+  check('4a crea 2 registros', r1.created.length === 2, r1.created);
+  check('4a pendiente $100 (50%) para el fallback', r1.created[1].amount === 100);
+
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantProfile', name: 'Ana Test', room: 'Pieza 2', paysUtilities: true });
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantProfile', name: 'Beto Test', room: 'Pieza 2', paysUtilities: true });
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantProfile', name: 'Carla Test', room: 'Pieza 1', paysUtilities: false });
+
+  const r2 = callDoPost(sandbox, { secret: SECRET, action: 'addExpense', date: '2026-08-09', amount: 200, type: 'Water' });
+  check('4b crea 3 registros (2 personas pagan servicios)', r2.created.length === 3, r2.created);
+  const pend = r2.created.slice(1);
+  check('4b cada pendiente es $50 (100/2)', pend.every((p) => p.amount === 50), pend);
+}
+
+// ---------------------------------------------------------------
+section('5. To Landlord: completa la fila prellenada de la fecha, no duplica');
+{
+  const { ss, sandbox } = freshSandbox();
+  const before = ss.getSheetByName('To Landlord').getLastRow();
+  const res = callDoPost(sandbox, { secret: SECRET, action: 'addLandlordPayment', date: '2026-01-15', amount: 500, type: 'Rent' });
+  check('ok', res.ok === true, res);
+  check('NO agregó fila nueva (completó la prellenada del 15/01)', ss.getSheetByName('To Landlord').getLastRow() === before, { before });
+
+  const before2 = ss.getSheetByName('To Landlord').getLastRow();
+  callDoPost(sandbox, { secret: SECRET, action: 'addLandlordPayment', date: '2099-01-01', amount: 999, type: 'Other' });
+  check('fecha sin fila prellenada SÍ agrega una fila nueva', ss.getSheetByName('To Landlord').getLastRow() === before2 + 1);
+}
+
+// ---------------------------------------------------------------
+console.log('\n' + '='.repeat(50));
+console.log(pass + ' OK, ' + fail + ' FAIL');
+if (fail) process.exit(1);
+
+console.log('\nNota: esto valida la lógica con datos inventados. Para probar');
+console.log('contra tus datos reales de forma segura (no se sube a git),');
+console.log('pide una foto de datos actual y corre test-real-data.js.');

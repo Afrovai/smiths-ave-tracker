@@ -24,3 +24,7 @@ La app pide un **PIN** (6 dígitos) antes de mostrar nada — evita que alguien 
 1. Despliega el backend — ver [`apps-script/README.md`](./apps-script/README.md).
 2. Abre la app publicada, toca el ⚙ y pega la URL del Web App que te dio Google (el secreto ya viene precargado).
 3. Listo — queda guardado en el celular, no hay que repetir la configuración cada vez.
+
+## Cómo se prueban los cambios (sin que tengas que estar en la computadora a cada rato)
+
+Los cambios de `Code.gs` se prueban primero contra una copia de tus datos reales, en `apps-script/test/` — sin tocar tu planilla ni tu Drive, y sin pedirte nada. Solo cuando esas pruebas pasan se te manda el `Code.gs` final para que lo pegues y despliegues **una vez** — no en cada ajuste chico. Ver [`apps-script/test/README.md`](./apps-script/test/README.md).
