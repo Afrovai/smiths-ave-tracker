@@ -4,7 +4,7 @@ App web simple (para el celular) para anotar al momento: gastos de la casa, pago
 
 ## Cómo está armado
 
-- **`web/`** — la app (HTML/CSS/JS, sin dependencias externas). Se publica en GitHub Pages.
+- **`docs/`** — la app (HTML/CSS/JS, sin dependencias externas). Se publica en GitHub Pages (GitHub solo permite servir Pages desde `/` o `/docs`, por eso el nombre).
 - **`apps-script/`** — el código que corre en Google Apps Script, conectado a la planilla, que recibe lo que manda la app y escribe las filas. Ver `apps-script/README.md` para desplegarlo (paso manual, una sola vez, ~5 min).
 
 ## Inteligencia incluida
