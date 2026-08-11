@@ -67,6 +67,9 @@ class MockSheet {
     const nextRow = this.getLastRow() + 1;
     values.forEach((v, i) => this._set(nextRow, i + 1, v));
   }
+  deleteRow(row) {
+    this.grid.splice(row - 1, 1);
+  }
   setFrozenRows() {}
 }
 
@@ -135,8 +138,18 @@ function buildSandbox(ss, opts) {
   const SpreadsheetApp = { openById: () => ss };
   const Session = { getScriptTimeZone: () => 'Australia/Perth' };
 
+  // Mock de LockService: en Node no hay concurrencia real dentro de un mismo
+  // proceso síncrono, así que basta con un no-op — lo que importa para los
+  // tests es que Code.gs pueda llamar getScriptLock()/waitLock()/releaseLock()
+  // sin explotar por "LockService is not defined".
+  const LockService = {
+    getScriptLock() {
+      return { waitLock() {}, releaseLock() {} };
+    }
+  };
+
   const sandbox = {
-    SpreadsheetApp, Utilities, ContentService, Session, DriveApp,
+    SpreadsheetApp, Utilities, ContentService, Session, DriveApp, LockService,
     console, Object, Number, String, Math, Date, JSON, Array,
     __driveLog: driveLog
   };

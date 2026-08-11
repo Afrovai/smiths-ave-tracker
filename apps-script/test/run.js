@@ -176,6 +176,70 @@ section('6. Resumen nuevo: renta/servicios pagados por tipo, bond a devolver, re
 }
 
 // ---------------------------------------------------------------
+section('7. Borrar ficha por ID (no por nombre) — deja intacta la otra ficha con el mismo nombre');
+{
+  const { ss, sandbox } = freshSandbox();
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantProfile', name: 'Juan Plata', room: 'Pieza 2', bondAmount: 100 });
+  // Como upsertRegistryRow matchea por nombre, para simular el bug real (dos
+  // fichas con el mismo nombre, ej. por un espacio invisible distinto) se
+  // agrega la segunda fila directo al mock, saltándose el upsert.
+  const sheet = ss.getSheetByName('Arrendatarios');
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const row2 = headers.map((h) => (h === 'ID' ? 'dup-0002' : h === 'Nombre' ? 'Juan Plata' : h === 'Bond Monto' ? 200 : ''));
+  sheet.appendRow(row2);
+
+  const before = callDoGet(sandbox, { secret: SECRET, tenants: '1' });
+  check('hay 2 fichas "Juan Plata" antes de borrar', before.tenants.filter((t) => t['Nombre'] === 'Juan Plata').length === 2, before.tenants);
+  const dupId = before.tenants[1]['ID'];
+
+  const del = callDoPost(sandbox, { secret: SECRET, action: 'deleteTenantProfile', id: dupId });
+  check('deleteTenantProfile: ok', del.ok === true, del);
+
+  const after = callDoGet(sandbox, { secret: SECRET, tenants: '1' });
+  check('queda solo 1 ficha "Juan Plata"', after.tenants.filter((t) => t['Nombre'] === 'Juan Plata').length === 1, after.tenants);
+  check('quedó la ficha correcta (Bond Monto 100, no 200)', after.tenants[0]['Bond Monto'] === 100, after.tenants[0]);
+
+  const delAgain = callDoPost(sandbox, { secret: SECRET, action: 'deleteTenantProfile', id: dupId });
+  check('borrar un ID ya borrado devuelve ok:false con error claro', delAgain.ok === false && !!delAgain.error, delAgain);
+}
+
+// ---------------------------------------------------------------
+section('8. Renta esperada ancla en el primer pago tipo Rent, no en un Bond anterior');
+{
+  // OJO: freshSandbox() trae un pago "Rent" sintético precargado el
+  // 2026-01-01 (ver syntheticLandlord) — para esta prueba se necesita un
+  // "To Landlord" realmente vacío, si no ese pago sintético (no el Bond de
+  // esta prueba) sería el que falsamente "pasa" la aserción.
+  const ss = new MockSpreadsheet();
+  ss._seed('Tenants', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail', 'Room', 'Tenant']]);
+  ss._seed('To Landlord', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail']]);
+  ss._seed('Expenses', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail']]);
+  const sandbox = loadCode(buildSandbox(ss));
+  // Bond pagado primero (2026-01-01), renta real empieza después (2026-02-24).
+  callDoPost(sandbox, { secret: SECRET, action: 'addLandlordPayment', date: '2026-01-01', amount: 1600, type: 'Bond' });
+  callDoPost(sandbox, { secret: SECRET, action: 'addLandlordPayment', date: '2026-02-24', amount: 1600, type: 'Rent' });
+  const res = callDoGet(sandbox, { secret: SECRET, summary: '1' });
+  check('landlord.expected.sinceDate = 24/02/2026 (ignora el Bond del 01/01)', res.summary.landlord.expected.sinceDate === '24/02/2026', res.summary.landlord.expected);
+}
+
+// ---------------------------------------------------------------
+section('9. rowToObject normaliza fechas tipo Date real a texto dd/MM/yyyy (evita timestamps con hora)');
+{
+  const { ss, sandbox } = freshSandbox();
+  // Simula una fila donde la fecha se guardó como Date real (ej: tecleada a
+  // mano en Sheets), no como el texto que escribe appendRow.
+  ss._seed('Expenses', [
+    [],
+    ['Date', 'Amount', 'Payment Method', 'Type', 'Detail'],
+    [new Date(2026, 1, 24, 15, 30, 0), 50, 'Card', 'House', 'con hora en la celda']
+  ]);
+  const sandbox2 = loadCode(buildSandbox(ss));
+  const res = callDoGet(sandbox2, { secret: SECRET, full: '1' });
+  const dateStr = res.recent['Expenses'][0]['Date'];
+  check('fecha queda como "24/02/2026", sin hora ni "T"/"GMT"', dateStr === '24/02/2026', dateStr);
+}
+
+// ---------------------------------------------------------------
 console.log('\n' + '='.repeat(50));
 console.log(pass + ' OK, ' + fail + ' FAIL');
 if (fail) process.exit(1);

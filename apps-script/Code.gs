@@ -63,6 +63,15 @@ const REGISTRY_HEADERS = [
 const DOCS_FOLDER_NAME = '10 Smiths Avenue - Documentos (privado)';
 
 function doPost(e) {
+  // Evita que dos solicitudes casi simultáneas (ej: doble click en "Guardar"
+  // antes de que la primera termine) lean el mismo estado "no existe todavía"
+  // y ambas terminen creando una ficha duplicada en Arrendatarios.
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (err) {
+    return jsonOut({ ok: false, error: 'El sistema está ocupado con otra solicitud, intenta de nuevo en unos segundos.' });
+  }
   try {
     if (!e.postData || !e.postData.contents) {
       return jsonOut({ ok: false, error: 'Sin datos en la solicitud' });
@@ -160,6 +169,15 @@ function doPost(e) {
       const result = upsertRegistryRow(sheet, body.name, fields);
       created.push({ sheet: 'Arrendatarios', tenant: body.name, updated: result.updated });
 
+    } else if (body.action === 'deleteTenantProfile') {
+      requireFields(body, ['id']);
+      const sheet = ss.getSheetByName(REGISTRY_SHEET);
+      const result = sheet ? deleteRegistryRowById(sheet, body.id) : { deleted: false };
+      if (!result.deleted) {
+        return jsonOut({ ok: false, error: 'No se encontró esa ficha (puede que ya se haya borrado).' });
+      }
+      created.push({ sheet: 'Arrendatarios', deletedId: body.id });
+
     } else {
       return jsonOut({ ok: false, error: 'Acción desconocida: ' + body.action });
     }
@@ -168,6 +186,8 @@ function doPost(e) {
 
   } catch (err) {
     return jsonOut({ ok: false, error: String(err) });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -250,6 +270,26 @@ function upsertRegistryRow(sheet, name, fields) {
     }
   });
   return { updated: true };
+}
+
+// Borra UNA ficha por su "ID" (no por nombre) — así, si por error quedaron
+// dos fichas con el mismo nombre (ej: doble click antes de este fix), se
+// puede borrar específicamente la que sobra sin arriesgar la otra.
+function deleteRegistryRowById(sheet, id) {
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2) return { deleted: false };
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const idIdx = headers.indexOf('ID');
+  if (idIdx === -1) return { deleted: false };
+  const data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][idIdx]).trim() === String(id).trim()) {
+      sheet.deleteRow(2 + i);
+      return { deleted: true };
+    }
+  }
+  return { deleted: false };
 }
 
 function getRegistryRows(ss) {
@@ -420,10 +460,13 @@ function computeBond(tenantRows, registryRows) {
 }
 
 // Cuánto DEBERÍA llevar pagado Nicolás al arrendador según la tarifa fija
-// ($1.600 cada 2 semanas), calculado desde la fecha del primer pago
-// registrado en "To Landlord" hasta hoy — para comparar contra lo real.
+// ($1.600 cada 2 semanas), calculado desde la fecha del PRIMER PAGO DE
+// RENTA (Type = "Rent") hasta hoy — no desde el primer pago de cualquier
+// tipo, porque el primer pago real fue el bond (que no es parte de la
+// tarifa recurrente) y eso adelantaba la fecha de inicio incorrectamente.
 function computeLandlordExpected(landlordRows) {
-  const dates = landlordRows.map(function (r) { return parseSheetDate(r['Date']); }).filter(function (d) { return d; });
+  const rentRows = landlordRows.filter(function (r) { return r['Type'] === 'Rent'; });
+  const dates = rentRows.map(function (r) { return parseSheetDate(r['Date']); }).filter(function (d) { return d; });
   if (!dates.length) return null;
   const minDate = new Date(Math.min.apply(null, dates.map(function (d) { return d.getTime(); })));
   const today = new Date();
@@ -665,6 +708,12 @@ function rowToObject(headers, row) {
   headers.forEach(function (h, i) {
     if (h && !(h in obj)) obj[h] = row[i];
   });
+  // Si la celda de fecha quedó como un Date real de Sheets (en vez del texto
+  // que escribe esta app), JSON.stringify la convertiría en un timestamp
+  // completo (con hora/zona) — la app solo debe mostrar día/mes/año.
+  if (obj['Date'] instanceof Date) {
+    obj['Date'] = Utilities.formatDate(obj['Date'], Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  }
   return obj;
 }
 

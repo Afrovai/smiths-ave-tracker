@@ -180,16 +180,21 @@
   .roommate-card .room { font-size: 12px; color: var(--ink-2); }
   .roommate-card .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .roommate-card .status-inactive { color: var(--muted); font-style: italic; }
-  .profile-docs { display: flex; gap: 8px; margin-top: 6px; }
+  .profile-docs { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
   .profile-docs a {
     font-size: 11.5px; color: var(--accent); text-decoration: none; font-weight: 600;
     border: 1px solid var(--line); border-radius: 100px; padding: 3px 9px;
+  }
+  .delete-btn {
+    font-size: 11.5px; color: var(--bad); font-weight: 700; cursor: pointer;
+    margin-top: 8px; display: inline-block;
   }
   .form-note { font-size: 11.5px; color: var(--muted); margin-top: -6px; }
   button.secondary {
     padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg);
     color: var(--ink-2); font-size: 13px; font-weight: 600; cursor: pointer;
   }
+  button.submit:disabled, .sheet button:disabled { opacity: 0.6; cursor: default; }
 
   .overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none;
@@ -354,6 +359,9 @@
 
     <div class="section-title">Resumen</div>
     <div id="landlordSummary"><div class="dash-empty">Configura la conexión (⚙) para ver esto.</div></div>
+
+    <div class="section-title">Historial</div>
+    <div id="landlordHistory"></div>
   </form>
 
   <!-- EXPENSE -->
@@ -725,21 +733,51 @@
     setTimeout(function () { el.className = 'banner'; }, 5000);
   }
 
+  // 20s de plazo — si Apps Script no responde en ese tiempo (cold start,
+  // sin conexión, etc.) se corta y se muestra un error claro en vez de
+  // dejar el botón "cargando" para siempre.
+  var POST_TIMEOUT_MS = 20000;
+
   function post(payload) {
     if (!cfg.url) { openSettings(); return Promise.reject(new Error('Sin configurar')); }
     payload.secret = cfg.secret;
+    var controller = ('AbortController' in window) ? new AbortController() : null;
+    var timedOut = false;
+    var timeoutId = controller ? setTimeout(function () { timedOut = true; controller.abort(); }, POST_TIMEOUT_MS) : null;
     // Content-Type text/plain a propósito: evita el preflight CORS que
     // Apps Script Web Apps no maneja bien.
     return fetch(cfg.url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    }).then(function (r) { return r.json(); });
+      body: JSON.stringify(payload),
+      signal: controller ? controller.signal : undefined
+    }).then(function (r) {
+      if (timeoutId) clearTimeout(timeoutId);
+      return r.json();
+    }).catch(function (err) {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (timedOut) throw new Error('Tiempo de espera agotado (20s). Revisa tu conexión e intenta de nuevo.');
+      throw err;
+    });
+  }
+
+  // Deshabilita el botón y le pone un texto de "cargando" mientras workFn()
+  // esté pendiente — evita doble-click (causa real de fichas duplicadas) y
+  // le muestra a Nicolás que la solicitud sigue en curso.
+  function withLoadingState(btn, loadingText, workFn) {
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = loadingText;
+    return workFn().finally(function () {
+      btn.disabled = false;
+      btn.textContent = original;
+    });
   }
 
   document.getElementById('form-expense').addEventListener('submit', function (ev) {
     ev.preventDefault();
     var f = ev.target;
+    var btn = f.querySelector('button[type="submit"]');
     var usingAutoPayers = billPayers().length > 0;
     var payload = {
       action: 'addExpense',
@@ -752,40 +790,48 @@
       splitPct: (usingAutoPayers ? Number(splitPctAuto.value || 0) : Number(splitPct.value || 0)) / 100
     };
     if (!usingAutoPayers) payload.splitTenant = splitTenant.value;
-    post(payload).then(function (res) {
-      if (res.ok) {
-        var extra = res.created.length > 1 ? ' + cobro pendiente creado' : '';
-        showBanner('banner-expense', true, 'Registrado' + extra + '.');
-        f.reset(); f.date.value = today; updateSplitUI();
-        loadAllAndRenderActive();
-      } else { showBanner('banner-expense', false, res.error || 'Error'); }
-    }).catch(function (e) { showBanner('banner-expense', false, String(e)); });
+    withLoadingState(btn, 'Guardando…', function () {
+      return post(payload).then(function (res) {
+        if (res.ok) {
+          var extra = res.created.length > 1 ? ' + cobro pendiente creado' : '';
+          showBanner('banner-expense', true, 'Registrado' + extra + '.');
+          f.reset(); f.date.value = today; updateSplitUI();
+          loadAllAndRenderActive();
+        } else { showBanner('banner-expense', false, res.error || 'Error'); }
+      }).catch(function (e) { showBanner('banner-expense', false, String(e.message || e)); });
+    });
   });
 
   document.getElementById('form-tenant').addEventListener('submit', function (ev) {
     ev.preventDefault();
     var f = ev.target;
-    post({
-      action: 'addTenantPayment',
-      date: f.date.value, amount: f.amount.value, paymentMethod: f.paymentMethod.value,
-      type: f.type.value, room: f.room.value, tenant: f.tenant.value, detail: f.detail.value
-    }).then(function (res) {
-      if (res.ok) { showBanner('banner-tenant', true, 'Registrado.'); f.reset(); f.date.value = today; loadAllAndRenderActive(); }
-      else { showBanner('banner-tenant', false, res.error || 'Error'); }
-    }).catch(function (e) { showBanner('banner-tenant', false, String(e)); });
+    var btn = f.querySelector('button[type="submit"]');
+    withLoadingState(btn, 'Guardando…', function () {
+      return post({
+        action: 'addTenantPayment',
+        date: f.date.value, amount: f.amount.value, paymentMethod: f.paymentMethod.value,
+        type: f.type.value, room: f.room.value, tenant: f.tenant.value, detail: f.detail.value
+      }).then(function (res) {
+        if (res.ok) { showBanner('banner-tenant', true, 'Registrado.'); f.reset(); f.date.value = today; loadAllAndRenderActive(); }
+        else { showBanner('banner-tenant', false, res.error || 'Error'); }
+      }).catch(function (e) { showBanner('banner-tenant', false, String(e.message || e)); });
+    });
   });
 
   document.getElementById('form-landlord').addEventListener('submit', function (ev) {
     ev.preventDefault();
     var f = ev.target;
-    post({
-      action: 'addLandlordPayment',
-      date: f.date.value, amount: f.amount.value, paymentMethod: f.paymentMethod.value,
-      type: f.type.value, detail: f.detail.value
-    }).then(function (res) {
-      if (res.ok) { showBanner('banner-landlord', true, 'Registrado.'); f.reset(); f.date.value = today; loadAllAndRenderActive(); }
-      else { showBanner('banner-landlord', false, res.error || 'Error'); }
-    }).catch(function (e) { showBanner('banner-landlord', false, String(e)); });
+    var btn = f.querySelector('button[type="submit"]');
+    withLoadingState(btn, 'Guardando…', function () {
+      return post({
+        action: 'addLandlordPayment',
+        date: f.date.value, amount: f.amount.value, paymentMethod: f.paymentMethod.value,
+        type: f.type.value, detail: f.detail.value
+      }).then(function (res) {
+        if (res.ok) { showBanner('banner-landlord', true, 'Registrado.'); f.reset(); f.date.value = today; loadAllAndRenderActive(); }
+        else { showBanner('banner-landlord', false, res.error || 'Error'); }
+      }).catch(function (e) { showBanner('banner-landlord', false, String(e.message || e)); });
+    });
   });
 
   // ---- registro de arrendatarios: formulario (dentro del modal) ----
@@ -839,6 +885,8 @@
 
   document.getElementById('form-roommate').addEventListener('submit', function (ev) {
     ev.preventDefault();
+    var f = ev.target;
+    var btn = f.querySelector('button[type="submit"]');
     var idPhotoFile = document.getElementById('rmIdPhoto').files[0];
     var incomeFile = document.getElementById('rmIncomeProof').files[0];
     var statusId = document.getElementById('rmIdPhotoStatus');
@@ -846,34 +894,37 @@
     if (idPhotoFile) statusId.textContent = 'Subiendo…';
     if (incomeFile) statusIncome.textContent = 'Subiendo…';
 
-    Promise.all([fileToPayload(idPhotoFile), fileToPayload(incomeFile)]).then(function (results) {
-      var payload = {
-        action: 'addTenantProfile',
-        name: document.getElementById('rmName').value,
-        room: rmRoom.value,
-        rent: rmRent.value,
-        frequency: rmFrequency.value,
-        status: document.getElementById('rmStatus').value,
-        paysUtilities: document.getElementById('rmPaysUtilities').checked,
-        bondAmount: document.getElementById('rmBondAmount').value,
-        bondDate: document.getElementById('rmBondDate').value,
-        bondDetail: document.getElementById('rmBondDetail').value
-      };
-      if (results[0]) payload.idPhoto = results[0];
-      if (results[1]) payload.incomeProof = results[1];
-      return post(payload);
-    }).then(function (res) {
-      if (res.ok) {
-        showBanner('banner-roommate', true, res.created[0].updated ? 'Ficha actualizada.' : 'Ficha guardada.');
-        statusId.textContent = idPhotoFile ? 'Subida ✓' : '';
-        statusIncome.textContent = incomeFile ? 'Subida ✓' : '';
-        loadTenantsRegistry();
-        loadRoommates();
-        loadAllAndRenderActive();
-      } else {
-        showBanner('banner-roommate', false, res.error || 'Error');
-      }
-    }).catch(function (e) { showBanner('banner-roommate', false, String(e)); });
+    withLoadingState(btn, 'Guardando…', function () {
+      return Promise.all([fileToPayload(idPhotoFile), fileToPayload(incomeFile)]).then(function (results) {
+        var payload = {
+          action: 'addTenantProfile',
+          name: document.getElementById('rmName').value,
+          room: rmRoom.value,
+          rent: rmRent.value,
+          frequency: rmFrequency.value,
+          status: document.getElementById('rmStatus').value,
+          paysUtilities: document.getElementById('rmPaysUtilities').checked,
+          bondAmount: document.getElementById('rmBondAmount').value,
+          bondDate: document.getElementById('rmBondDate').value,
+          bondDetail: document.getElementById('rmBondDetail').value
+        };
+        if (results[0]) payload.idPhoto = results[0];
+        if (results[1]) payload.incomeProof = results[1];
+        return post(payload);
+      }).then(function (res) {
+        if (res.ok) {
+          showBanner('banner-roommate', true, res.created[0].updated ? 'Ficha actualizada.' : 'Ficha guardada.');
+          f.reset();
+          statusId.textContent = '';
+          statusIncome.textContent = '';
+          loadTenantsRegistry();
+          loadRoommates();
+          loadAllAndRenderActive();
+        } else {
+          showBanner('banner-roommate', false, res.error || 'Error');
+        }
+      }).catch(function (e) { showBanner('banner-roommate', false, String(e.message || e)); });
+    });
   });
 
   function loadRoommates() {
@@ -895,11 +946,12 @@
           '<div class="meta">$' + (t['Renta'] || '—') + '/semana · ' + (t['Frecuencia'] || '—') + ' · ' + (t['Paga Servicios'] === 'Sí' ? 'Paga servicios' : 'No paga servicios') +
           (t['Bond Monto'] ? ' · Bond $' + t['Bond Monto'] : '') + '</div>' +
           (docs ? '<div class="profile-docs">' + docs + '</div>' : '') +
+          '<div class="delete-btn" data-idx="' + i + '">Eliminar ficha</div>' +
           '</div>';
       }).join('');
       list.querySelectorAll('.roommate-card').forEach(function (card) {
         card.addEventListener('click', function (ev) {
-          if (ev.target.tagName === 'A') return; // no interceptar los links de documentos
+          if (ev.target.tagName === 'A' || ev.target.classList.contains('delete-btn')) return; // no interceptar links ni el botón de borrar
           var t = tenantsRegistry[Number(card.dataset.idx)];
           document.getElementById('rmName').value = t['Nombre'] || '';
           rmRoom.value = t['Pieza'] || 'Pieza 1';
@@ -909,6 +961,26 @@
           document.getElementById('rmPaysUtilities').checked = t['Paga Servicios'] === 'Sí';
           document.getElementById('rmBondAmount').value = t['Bond Monto'] || '';
           document.getElementById('rmBondDetail').value = t['Bond Detalle'] || '';
+        });
+      });
+      list.querySelectorAll('.delete-btn').forEach(function (btn) {
+        btn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          var t = tenantsRegistry[Number(btn.dataset.idx)];
+          if (!t) return;
+          if (!confirm('¿Eliminar la ficha de ' + t['Nombre'] + '? Sus pagos ya registrados NO se borran, solo esta ficha.')) return;
+          var original = btn.textContent;
+          btn.textContent = 'Eliminando…';
+          post({ action: 'deleteTenantProfile', id: t['ID'] }).then(function (res) {
+            if (res.ok) {
+              loadTenantsRegistry();
+              loadRoommates();
+              loadAllAndRenderActive();
+            } else {
+              alert(res.error || 'Error al eliminar');
+              btn.textContent = original;
+            }
+          }).catch(function (e) { alert(String(e.message || e)); btn.textContent = original; });
         });
       });
     }).catch(function () { list.innerHTML = '<div class="dash-empty">No se pudo conectar.</div>'; });
@@ -924,6 +996,7 @@
   var latestSummary = null;
   var historyTenants = [];
   var historyExpenses = [];
+  var historyLandlord = [];
 
   function loadAllAndRenderActive() {
     if (!cfg.url) { renderActiveTab(); return Promise.resolve(); }
@@ -943,13 +1016,17 @@
       if (res.ok) {
         historyTenants = res.recent['Tenants'] || [];
         historyExpenses = res.recent['Expenses'] || [];
+        // "To Landlord" trae filas futuras precargadas con el monto vacío
+        // (para que appendRow las complete en vez de duplicar) — no son
+        // pagos reales todavía, no deben aparecer en el historial.
+        historyLandlord = (res.recent['To Landlord'] || []).filter(function (r) { return r['Amount'] !== '' && r['Amount'] != null; });
       }
-    }).catch(function () { historyTenants = []; historyExpenses = []; });
+    }).catch(function () { historyTenants = []; historyExpenses = []; historyLandlord = []; });
   }
 
   function renderActiveTab() {
     if (activeTab === 'tenant') { renderTenantSummary(); renderTenantHistory(); }
-    else if (activeTab === 'landlord') { renderLandlordSummary(); }
+    else if (activeTab === 'landlord') { renderLandlordSummary(); renderLandlordHistory(); }
     else if (activeTab === 'expense') { renderExpenseSummary(); renderExpenseHistory(); }
   }
 
@@ -1052,11 +1129,29 @@
     if (expected) {
       var diff = round2(rentToLandlord - expected.amount);
       html += '<div class="section-title">Renta esperada <span class="tot">$1.600 / 2 semanas</span></div>' +
-        '<div class="auto-note">Calculada desde el primer pago registrado (' + expected.sinceDate + ') hasta hoy.</div>' +
+        '<div class="auto-note">Calculada desde el primer pago de renta (' + expected.sinceDate + ') hasta hoy — no cuenta el bond.</div>' +
         '<div class="auto-row"><span class="n">Debería llevar pagado</span><span class="v">' + money(expected.amount) + '</span></div>' +
         '<div class="auto-row total"><span class="n">Diferencia (real − esperado)</span><span class="v" style="color:' + (diff >= 0 ? 'var(--good)' : 'var(--bad)') + '">' + money(diff) + '</span></div>';
     }
     el.innerHTML = html;
+  }
+
+  function renderLandlordHistory() {
+    var el = document.getElementById('landlordHistory');
+    if (!cfg.url) { el.innerHTML = ''; return; }
+    if (!historyLandlord.length) { el.innerHTML = '<div class="recent-empty">Sin movimientos todavía.</div>'; return; }
+    el.innerHTML = historyLandlord.map(function (r, i) {
+      return '<div class="history-item" data-idx="' + i + '">' +
+        '<span class="l">' + (r['Date'] || '') + ' · ' + (r['Type'] || '') + '</span>' +
+        '<span class="r">' + money(r['Amount']) + '</span>' +
+        '</div>' +
+        '<div class="history-detail" id="landlordDetail' + i + '">' + (r['Detail'] || 'Sin detalle') + ' · ' + (r['Payment Method'] || '') + '</div>';
+    }).join('');
+    el.querySelectorAll('.history-item').forEach(function (row) {
+      row.addEventListener('click', function () {
+        document.getElementById('landlordDetail' + row.dataset.idx).classList.toggle('show');
+      });
+    });
   }
 
   if (sessionStorage.getItem(LOCK_KEY) === '1') { loadTenantsRegistry(); loadAllAndRenderActive(); }
