@@ -6,37 +6,41 @@
 <title>10 Smiths Ave — Registro rápido</title>
 <style>
   :root {
-    --bg: #f4f5f3;
+    --bg: #ffffff;
     --card: #ffffff;
-    --ink: #17201c;
-    --ink-2: #5b655f;
-    --muted: #8a938c;
-    --line: #e2e5e0;
-    --accent: #2f6b4f;
-    --accent-ink: #1f4a37;
-    --good: #1e7a3c;
-    --good-wash: #e9f4ec;
-    --bad: #b4392e;
-    --bad-wash: #f9eae8;
-    --pending: #b5701a;
-    --pending-wash: #faf0e2;
+    --ink: #111111;
+    --ink-2: #55555a;
+    --muted: #98989c;
+    --line: #e4e4e4;
+    --accent: #111111;
+    --accent-ink: #000000;
+    --accent-contrast: #ffffff;
+    --good: #2f6b52;
+    --good-wash: #eef3f0;
+    --bad: #8a3a34;
+    --bad-wash: #f5eeed;
+    --pending: #8a6d3f;
+    --pending-wash: #f5f0e8;
+    --card-shadow: 0 1px 3px rgba(17, 17, 17, 0.05);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0f1311;
-      --card: #171c19;
-      --ink: #eef1ee;
-      --ink-2: #aab3ac;
-      --muted: #7c847e;
-      --line: #2a302c;
-      --accent: #4fa87d;
-      --accent-ink: #a6dcc0;
-      --good: #3fbe72;
-      --good-wash: #163823;
-      --bad: #e2695a;
-      --bad-wash: #3a1f1c;
-      --pending: #e0a94a;
-      --pending-wash: #3a2c15;
+      --bg: #0a0a0a;
+      --card: #151515;
+      --ink: #f2f2f2;
+      --ink-2: #a8a8ac;
+      --muted: #737377;
+      --line: #2a2a2a;
+      --accent: #f2f2f2;
+      --accent-ink: #ffffff;
+      --accent-contrast: #111111;
+      --good: #6fae8c;
+      --good-wash: #16211c;
+      --bad: #c98a83;
+      --bad-wash: #241715;
+      --pending: #cbb180;
+      --pending-wash: #241d13;
+      --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
   }
   * { box-sizing: border-box; }
@@ -79,11 +83,12 @@
     border-radius: 9px; border: 1px solid var(--line); background: var(--card);
     color: var(--ink-2); cursor: pointer; white-space: nowrap;
   }
-  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
 
   .card {
     background: var(--card); border: 1px solid var(--line); border-radius: 14px;
     padding: 18px; display: none; flex-direction: column; gap: 14px;
+    box-shadow: var(--card-shadow);
   }
   .card.active { display: flex; }
 
@@ -110,7 +115,7 @@
 
   button.submit {
     margin-top: 4px; padding: 14px; border-radius: 10px; border: none;
-    background: var(--accent); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+    background: var(--accent); color: var(--accent-contrast); font-size: 15px; font-weight: 700; cursor: pointer;
   }
   button.submit:disabled { opacity: 0.6; }
   button.submit:active { transform: scale(0.99); }
@@ -208,12 +213,13 @@
     background: var(--card); width: 100%; max-width: 480px; border-radius: 16px 16px 0 0;
     padding: 20px 18px 26px; display: flex; flex-direction: column; gap: 12px;
     max-height: 88vh; overflow-y: auto;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
   }
   .sheet h2 { margin: 0 0 4px; font-size: 16px; }
   .sheet .hint { font-size: 12px; color: var(--muted); margin-top: -6px; }
   .sheet .actions { display: flex; gap: 10px; margin-top: 6px; }
   .sheet button { flex: 1; padding: 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-weight: 600; font-size: 14px; cursor: pointer; }
-  .sheet button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .sheet button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
 
   .lock {
     position: fixed; inset: 0; background: var(--bg); z-index: 50;
@@ -230,7 +236,7 @@
   }
   .lock button {
     width: 200px; padding: 12px; border-radius: 10px; border: none;
-    background: var(--accent); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer;
+    background: var(--accent); color: var(--accent-contrast); font-weight: 700; font-size: 14px; cursor: pointer;
   }
   .lock .lock-err { font-size: 12.5px; color: var(--bad); min-height: 16px; }
   body.locked > header, body.locked > main { display: none; }
