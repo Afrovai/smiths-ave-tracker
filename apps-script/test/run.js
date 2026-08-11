@@ -240,6 +240,26 @@ section('9. rowToObject normaliza fechas tipo Date real a texto dd/MM/yyyy (evit
 }
 
 // ---------------------------------------------------------------
+section('10. Lo mismo pero para "Bond Fecha" / "Fecha Inicio" del registro (bug real encontrado en la planilla de Nicolás)');
+{
+  const { ss, sandbox } = freshSandbox();
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantProfile', name: 'Carla Test', room: 'Pieza 1', bondAmount: 500 });
+  // addTenantProfile siempre escribe texto — para reproducir el caso real
+  // (fichas viejas con la fecha tecleada directo en Sheets como Date real)
+  // se sobreescribe la celda a mano con un objeto Date.
+  const sheet = ss.getSheetByName('Arrendatarios');
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const bondFechaCol = headers.indexOf('Bond Fecha') + 1;
+  const fechaInicioCol = headers.indexOf('Fecha Inicio') + 1;
+  sheet.getRange(2, bondFechaCol).setValue(new Date(2026, 2, 13, 16, 0, 0));
+  sheet.getRange(2, fechaInicioCol).setValue(new Date(2026, 7, 10, 16, 0, 0));
+
+  const res = callDoGet(sandbox, { secret: SECRET, tenants: '1' });
+  check('Bond Fecha = "13/03/2026" (no timestamp ISO)', res.tenants[0]['Bond Fecha'] === '13/03/2026', res.tenants[0]['Bond Fecha']);
+  check('Fecha Inicio = "10/08/2026" (no timestamp ISO)', res.tenants[0]['Fecha Inicio'] === '10/08/2026', res.tenants[0]['Fecha Inicio']);
+}
+
+// ---------------------------------------------------------------
 console.log('\n' + '='.repeat(50));
 console.log(pass + ' OK, ' + fail + ' FAIL');
 if (fail) process.exit(1);

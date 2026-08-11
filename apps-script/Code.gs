@@ -708,12 +708,16 @@ function rowToObject(headers, row) {
   headers.forEach(function (h, i) {
     if (h && !(h in obj)) obj[h] = row[i];
   });
-  // Si la celda de fecha quedó como un Date real de Sheets (en vez del texto
-  // que escribe esta app), JSON.stringify la convertiría en un timestamp
-  // completo (con hora/zona) — la app solo debe mostrar día/mes/año.
-  if (obj['Date'] instanceof Date) {
-    obj['Date'] = Utilities.formatDate(obj['Date'], Session.getScriptTimeZone(), 'dd/MM/yyyy');
-  }
+  // Cualquier celda que haya quedado como Date real de Sheets (en vez del
+  // texto que escribe esta app) — no solo "Date", también "Bond Fecha" /
+  // "Fecha Inicio" del registro de arrendatarios — se normaliza a
+  // dd/MM/yyyy. Si no, JSON.stringify la convierte en un timestamp completo
+  // (con hora y zona) y la app debe mostrar solo día/mes/año.
+  Object.keys(obj).forEach(function (k) {
+    if (obj[k] instanceof Date) {
+      obj[k] = Utilities.formatDate(obj[k], Session.getScriptTimeZone(), 'dd/MM/yyyy');
+    }
+  });
   return obj;
 }
 
