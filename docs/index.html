@@ -167,6 +167,9 @@
     font-size: 12.5px; color: var(--accent); font-weight: 700; cursor: pointer;
     text-align: right; margin: -6px 0 2px;
   }
+  .history-edit-btn {
+    font-size: 11.5px; color: var(--accent); font-weight: 700; cursor: pointer; margin-top: 8px;
+  }
 
   /* ---------- registro de arrendatarios (modal) ---------- */
   input[type="file"] { padding: 9px; font-size: 13px; }
@@ -535,6 +538,62 @@
     <div id="roommateList"><div class="dash-empty">Configura la conexión (⚙) para ver esto.</div></div>
 
     <button type="button" id="roommateClose">Cerrar</button>
+  </div>
+</div>
+
+<div class="overlay" id="editOverlay">
+  <div class="sheet">
+    <h2>Editar registro</h2>
+    <form id="form-edit">
+      <div class="row2">
+        <div>
+          <label>Fecha</label>
+          <input type="date" id="editDate" required>
+        </div>
+        <div>
+          <label>Monto (AUD)</label>
+          <input type="number" id="editAmount" step="0.01" min="0" required>
+        </div>
+      </div>
+      <div class="row2">
+        <div>
+          <label>Método de pago</label>
+          <select id="editPaymentMethod">
+            <option>Transfer</option>
+            <option>Cash</option>
+            <option>Card</option>
+            <option>BPAY</option>
+          </select>
+        </div>
+        <div>
+          <label>Tipo</label>
+          <select id="editType"></select>
+        </div>
+      </div>
+      <div class="row2" id="editTenantRoomRow">
+        <div>
+          <label>Room</label>
+          <select id="editRoom">
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </div>
+        <div>
+          <label>Inquilino</label>
+          <input type="text" id="editTenant" list="tenantList">
+        </div>
+      </div>
+      <div>
+        <label>Detalle</label>
+        <input type="text" id="editDetail">
+      </div>
+      <div class="actions">
+        <button type="button" id="editDeleteBtn" style="color:var(--bad)">Eliminar</button>
+        <button type="submit" class="primary">Guardar cambios</button>
+      </div>
+      <div class="banner" id="banner-edit"></div>
+    </form>
+    <button type="button" id="editCancel">Cancelar</button>
   </div>
 </div>
 
@@ -1066,11 +1125,18 @@
         '<span class="l">' + (r['Tenant'] || '—') + ' · ' + (r['Date'] || '') + '<br>' + (r['Type'] || '') + '</span>' +
         '<span class="r' + (pending ? ' pending' : '') + '">' + money(r['Amount']) + '</span>' +
         '</div>' +
-        '<div class="history-detail" id="tenantDetail' + i + '">' + (r['Detail'] || 'Sin detalle') + (pending ? ' · Pendiente de pago' : '') + '</div>';
+        '<div class="history-detail" id="tenantDetail' + i + '">' + (r['Detail'] || 'Sin detalle') + (pending ? ' · Pendiente de pago' : '') +
+        '<div class="history-edit-btn" data-idx="' + i + '">Editar / eliminar ›</div></div>';
     }).join('');
     el.querySelectorAll('.history-item').forEach(function (row) {
       row.addEventListener('click', function () {
         document.getElementById('tenantDetail' + row.dataset.idx).classList.toggle('show');
+      });
+    });
+    el.querySelectorAll('.history-edit-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        openEditModal('Tenants', historyTenants[Number(btn.dataset.idx)]);
       });
     });
   }
@@ -1095,11 +1161,18 @@
         '<span class="l">' + (r['Date'] || '') + ' · ' + (r['Type'] || '') + '</span>' +
         '<span class="r">' + money(r['Amount']) + '</span>' +
         '</div>' +
-        '<div class="history-detail" id="expenseDetail' + i + '">' + (r['Detail'] || 'Sin detalle') + ' · ' + (r['Payment Method'] || '') + '</div>';
+        '<div class="history-detail" id="expenseDetail' + i + '">' + (r['Detail'] || 'Sin detalle') + ' · ' + (r['Payment Method'] || '') +
+        '<div class="history-edit-btn" data-idx="' + i + '">Editar / eliminar ›</div></div>';
     }).join('');
     el.querySelectorAll('.history-item').forEach(function (row) {
       row.addEventListener('click', function () {
         document.getElementById('expenseDetail' + row.dataset.idx).classList.toggle('show');
+      });
+    });
+    el.querySelectorAll('.history-edit-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        openEditModal('Expenses', historyExpenses[Number(btn.dataset.idx)]);
       });
     });
   }
@@ -1145,14 +1218,116 @@
         '<span class="l">' + (r['Date'] || '') + ' · ' + (r['Type'] || '') + '</span>' +
         '<span class="r">' + money(r['Amount']) + '</span>' +
         '</div>' +
-        '<div class="history-detail" id="landlordDetail' + i + '">' + (r['Detail'] || 'Sin detalle') + ' · ' + (r['Payment Method'] || '') + '</div>';
+        '<div class="history-detail" id="landlordDetail' + i + '">' + (r['Detail'] || 'Sin detalle') + ' · ' + (r['Payment Method'] || '') +
+        '<div class="history-edit-btn" data-idx="' + i + '">Editar / eliminar ›</div></div>';
     }).join('');
     el.querySelectorAll('.history-item').forEach(function (row) {
       row.addEventListener('click', function () {
         document.getElementById('landlordDetail' + row.dataset.idx).classList.toggle('show');
       });
     });
+    el.querySelectorAll('.history-edit-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        openEditModal('To Landlord', historyLandlord[Number(btn.dataset.idx)]);
+      });
+    });
   }
+
+  // ---- editar / eliminar un registro existente ----
+  var TYPE_OPTIONS = {
+    'Expenses': ['House', 'Internet', 'Water', 'Electricity', 'Gas', 'Other'],
+    'Tenants': ['Rent', 'Electricity', 'Water', 'Gas', 'Internet', 'Bond Held', 'Refund', 'Other'],
+    'To Landlord': ['Rent', 'Bond', 'Other']
+  };
+
+  // "24/02/26" o "24/02/2026" -> "2026-02-24" (lo que espera <input type=date>).
+  function displayDateToISO(s) {
+    var m = String(s || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+    if (!m) return '';
+    var dd = m[1].length === 1 ? '0' + m[1] : m[1];
+    var mm = m[2].length === 1 ? '0' + m[2] : m[2];
+    var yyyy = m[3].length === 2 ? '20' + m[3] : m[3];
+    return yyyy + '-' + mm + '-' + dd;
+  }
+
+  var editContext = null; // { sheet, row, record }
+  var editOverlay = document.getElementById('editOverlay');
+
+  function openEditModal(sheetName, record) {
+    if (!record) return;
+    editContext = { sheet: sheetName, row: record.__row, record: record };
+    document.getElementById('editDate').value = displayDateToISO(record['Date']);
+    document.getElementById('editAmount').value = record['Amount'];
+    document.getElementById('editPaymentMethod').value = String(record['Payment Method'] || 'Transfer').trim();
+    var typeSelect = document.getElementById('editType');
+    typeSelect.innerHTML = (TYPE_OPTIONS[sheetName] || []).map(function (t) {
+      return '<option' + (t === record['Type'] ? ' selected' : '') + '>' + t + '</option>';
+    }).join('');
+    document.getElementById('editDetail').value = record['Detail'] || '';
+    var tenantRoomRow = document.getElementById('editTenantRoomRow');
+    if (sheetName === 'Tenants') {
+      tenantRoomRow.style.display = 'grid';
+      document.getElementById('editTenant').value = record['Tenant'] || '';
+      document.getElementById('editRoom').value = record['Room'] ? String(record['Room']) : '1';
+    } else {
+      tenantRoomRow.style.display = 'none';
+    }
+    document.getElementById('banner-edit').className = 'banner';
+    editOverlay.classList.add('show');
+  }
+
+  document.getElementById('editCancel').addEventListener('click', function () {
+    editOverlay.classList.remove('show');
+  });
+
+  document.getElementById('form-edit').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (!editContext) return;
+    var btn = ev.target.querySelector('button[type="submit"]');
+    var payload = {
+      action: 'editRecord', sheet: editContext.sheet, row: editContext.row,
+      expectedAmount: editContext.record['Amount'], expectedDate: editContext.record['Date'],
+      date: document.getElementById('editDate').value,
+      amount: document.getElementById('editAmount').value,
+      paymentMethod: document.getElementById('editPaymentMethod').value,
+      type: document.getElementById('editType').value,
+      detail: document.getElementById('editDetail').value
+    };
+    if (editContext.sheet === 'Tenants') {
+      payload.tenant = document.getElementById('editTenant').value;
+      payload.room = document.getElementById('editRoom').value;
+    }
+    withLoadingState(btn, 'Guardando…', function () {
+      return post(payload).then(function (res) {
+        if (res.ok) {
+          editOverlay.classList.remove('show');
+          loadAllAndRenderActive();
+        } else {
+          showBanner('banner-edit', false, res.error || 'Error');
+        }
+      }).catch(function (e) { showBanner('banner-edit', false, String(e.message || e)); });
+    });
+  });
+
+  document.getElementById('editDeleteBtn').addEventListener('click', function () {
+    if (!editContext) return;
+    if (!confirm('¿Eliminar este registro? No se puede deshacer.')) return;
+    var btn = this;
+    withLoadingState(btn, 'Eliminando…', function () {
+      return post({
+        action: 'deleteRecord', sheet: editContext.sheet, row: editContext.row,
+        expectedAmount: editContext.record['Amount'], expectedDate: editContext.record['Date']
+      }).then(function (res) {
+        if (res.ok) {
+          editOverlay.classList.remove('show');
+          loadAllAndRenderActive();
+        } else {
+          showBanner('banner-edit', false, res.error || 'Error');
+        }
+      }).catch(function (e) { showBanner('banner-edit', false, String(e.message || e)); });
+    });
+  });
 
   if (sessionStorage.getItem(LOCK_KEY) === '1') { loadTenantsRegistry(); loadAllAndRenderActive(); }
 })();

@@ -260,6 +260,88 @@ section('10. Lo mismo pero para "Bond Fecha" / "Fecha Inicio" del registro (bug 
 }
 
 // ---------------------------------------------------------------
+section('11. Editar un registro (gasto) — cambia los valores en la fila correcta, no crea una fila nueva');
+{
+  const { ss, sandbox } = freshSandbox();
+  const before = ss.getSheetByName('Expenses').getLastRow();
+  callDoPost(sandbox, { secret: SECRET, action: 'addExpense', date: '2026-08-01', amount: 77, type: 'House', detail: 'original', autoSplit: false });
+  const afterAdd = ss.getSheetByName('Expenses').getLastRow();
+  check('agregar el gasto sumó exactamente 1 fila', afterAdd === before + 1, { before, afterAdd });
+
+  const full = callDoGet(sandbox, { secret: SECRET, full: '1' });
+  const row = full.recent['Expenses'].find((r) => r['Detail'] === 'original');
+  check('la fila nueva trae __row', typeof row.__row === 'number', row);
+
+  const edit = callDoPost(sandbox, {
+    secret: SECRET, action: 'editRecord', sheet: 'Expenses', row: row.__row,
+    expectedAmount: row['Amount'], expectedDate: row['Date'],
+    date: '2026-08-02', amount: 99, type: 'Internet', detail: 'corregido', paymentMethod: 'Cash'
+  });
+  check('editRecord: ok', edit.ok === true, edit);
+  check('NO agregó una fila nueva al editar', ss.getSheetByName('Expenses').getLastRow() === afterAdd, ss.getSheetByName('Expenses').getLastRow());
+
+  const full2 = callDoGet(sandbox, { secret: SECRET, full: '1' });
+  const edited = full2.recent['Expenses'].find((r) => r.__row === row.__row);
+  check('el monto quedó en 99', edited['Amount'] === 99, edited);
+  check('el detalle quedó en "corregido"', edited['Detail'] === 'corregido', edited);
+  check('el tipo quedó en Internet', edited['Type'] === 'Internet', edited);
+  check('la fecha quedó en 02/08/26', edited['Date'] === '02/08/26', edited['Date']);
+}
+
+// ---------------------------------------------------------------
+section('12. Borrar un registro (deleteRecord) — vacía la fila sin eliminarla ni afectar otras filas');
+{
+  const { ss, sandbox } = freshSandbox();
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantPayment', date: '2026-08-05', amount: 55, tenant: 'Borrar Test', type: 'Rent', room: '1' });
+  // Se agrega un SEGUNDO pago después, para que la fila que se va a borrar no
+  // quede como la última de la hoja — así se puede verificar que
+  // sheet.getLastRow() no cambia (una fila vaciada sigue existiendo, solo
+  // que en Sheets/el mock una fila en blanco AL FINAL de la hoja hace que
+  // getLastRow() "encoja" — comportamiento real de Sheets, no es lo que se
+  // quiere probar acá).
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantPayment', date: '2026-08-06', amount: 66, tenant: 'Despues Test', type: 'Rent', room: '2' });
+  const rowCountBefore = ss.getSheetByName('Tenants').getLastRow();
+
+  const full = callDoGet(sandbox, { secret: SECRET, full: '1' });
+  const row = full.recent['Tenants'].find((r) => r['Tenant'] === 'Borrar Test');
+
+  const del = callDoPost(sandbox, {
+    secret: SECRET, action: 'deleteRecord', sheet: 'Tenants', row: row.__row,
+    expectedAmount: row['Amount'], expectedDate: row['Date']
+  });
+  check('deleteRecord: ok', del.ok === true, del);
+  check('NO cambió la cantidad de filas de la hoja (no se movieron otras filas)', ss.getSheetByName('Tenants').getLastRow() === rowCountBefore, ss.getSheetByName('Tenants').getLastRow());
+
+  const summary = callDoGet(sandbox, { secret: SECRET, summary: '1' });
+  check('el pago borrado ya no cuenta en paidByTenant', !summary.summary.tenants.paidByTenant['Borrar Test'], summary.summary.tenants.paidByTenant);
+  check('el pago posterior (Despues Test) no se vio afectado', summary.summary.tenants.paidByTenant['Despues Test'] === 66, summary.summary.tenants.paidByTenant);
+
+  // No debe tocar la fila del resumen lateral de Room 2 (Ana Test es quien
+  // queda en esa columna en el seed sintético — ver syntheticTenants()).
+  check('el resumen lateral de Tenants (Room 2) sigue intacto tras borrar otra fila', summary.summary.autoTotals.tenantsSideSnapshot && summary.summary.autoTotals.tenantsSideSnapshot.tenant === 'Ana Test', summary.summary.autoTotals.tenantsSideSnapshot);
+}
+
+// ---------------------------------------------------------------
+section('13. editRecord/deleteRecord rechazan la operación si la fila cambió desde que se cargó la pantalla');
+{
+  const { ss, sandbox } = freshSandbox();
+  callDoPost(sandbox, { secret: SECRET, action: 'addExpense', date: '2026-08-01', amount: 40, type: 'House', autoSplit: false });
+  const full = callDoGet(sandbox, { secret: SECRET, full: '1' });
+  const row = full.recent['Expenses'].find((r) => r['Amount'] === 40);
+
+  const edit = callDoPost(sandbox, {
+    secret: SECRET, action: 'editRecord', sheet: 'Expenses', row: row.__row,
+    expectedAmount: 999, // monto incorrecto a propósito — no coincide con lo que hay en la fila
+    amount: 1
+  });
+  check('editRecord con expectedAmount equivocado: ok:false', edit.ok === false && !!edit.error, edit);
+
+  const full2 = callDoGet(sandbox, { secret: SECRET, full: '1' });
+  const stillThere = full2.recent['Expenses'].find((r) => r.__row === row.__row);
+  check('el monto NO cambió (el rechazo evitó la edición)', stillThere['Amount'] === 40, stillThere);
+}
+
+// ---------------------------------------------------------------
 console.log('\n' + '='.repeat(50));
 console.log(pass + ' OK, ' + fail + ' FAIL');
 if (fail) process.exit(1);

@@ -178,6 +178,21 @@ function doPost(e) {
       }
       created.push({ sheet: 'Arrendatarios', deletedId: body.id });
 
+    } else if (body.action === 'editRecord' || body.action === 'deleteRecord') {
+      requireFields(body, ['sheet', 'row']);
+      const editable = ['Expenses', 'Tenants', 'To Landlord'];
+      if (editable.indexOf(body.sheet) === -1) {
+        return jsonOut({ ok: false, error: 'Esa pestaña no se puede editar desde la app: ' + body.sheet });
+      }
+      const targetSheet = ss.getSheetByName(body.sheet);
+      if (!targetSheet) return jsonOut({ ok: false, error: 'No existe la pestaña ' + body.sheet });
+
+      const result = body.action === 'deleteRecord'
+        ? clearRecordRow(targetSheet, body)
+        : editRecordRow(targetSheet, body);
+      if (!result.ok) return jsonOut({ ok: false, error: result.error });
+      created.push({ sheet: body.sheet, row: body.row, action: body.action });
+
     } else {
       return jsonOut({ ok: false, error: 'Acción desconocida: ' + body.action });
     }
@@ -564,7 +579,11 @@ function allRows(ss, sheetName) {
   const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
   if (lastRow <= headerRow) return [];
   const values = sheet.getRange(headerRow + 1, 1, lastRow - headerRow, lastCol).getValues();
-  return values.map(function (row) { return rowToObject(headers, row); });
+  return values.map(function (row, i) {
+    const obj = rowToObject(headers, row);
+    obj.__row = headerRow + 1 + i; // fila real en la hoja — usada para editar/borrar
+    return obj;
+  });
 }
 
 // ---------- helpers ----------
@@ -648,6 +667,77 @@ function appendRow(ss, sheetName, valuesByHeader) {
   sheet.appendRow(row);
 }
 
+// Verifica que la fila que llegó desde la app (identificada por número de
+// fila, no por ID — estas pestañas no tienen columna ID) siga siendo la
+// misma que el usuario vio en pantalla, comparando Amount/Date actuales
+// contra lo que la app tenía cargado. Evita editar/borrar la fila
+// equivocada si algo cambió el orden de las filas entre que se cargó la
+// pantalla y que se guardó la edición.
+function validateRecordRow(sheet, body) {
+  const headerRow = findHeaderRow(sheet);
+  const rowNum = Number(body.row);
+  if (!rowNum || rowNum <= headerRow || rowNum > sheet.getLastRow()) {
+    return { ok: false, error: 'Esa fila ya no existe — actualiza la pantalla e intenta de nuevo.' };
+  }
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
+  if (body.expectedAmount != null || body.expectedDate) {
+    const current = rowToObject(headers, sheet.getRange(rowNum, 1, 1, lastCol).getValues()[0]);
+    const amountOk = body.expectedAmount == null || Number(current['Amount']) === Number(body.expectedAmount);
+    const dateOk = !body.expectedDate || current['Date'] === body.expectedDate;
+    if (!amountOk || !dateOk) {
+      return { ok: false, error: 'Esa fila cambió desde que se cargó la pantalla — actualiza e intenta de nuevo.' };
+    }
+  }
+  return { ok: true, rowNum: rowNum, headers: headers, lastCol: lastCol };
+}
+
+function editRecordRow(sheet, body) {
+  const v = validateRecordRow(sheet, body);
+  if (!v.ok) return v;
+
+  const values = {};
+  if (body.date) values['Date'] = formatIsoDate(body.date, DATE_FORMAT[sheet.getName()] || 'dd/MM/yyyy');
+  if (body.amount != null && body.amount !== '') values['Amount'] = Number(body.amount);
+  if (body.paymentMethod != null) values['Payment Method'] = body.paymentMethod;
+  if (body.type != null) values['Type'] = body.type;
+  if (body.detail != null) values['Detail'] = body.detail;
+  if (body.tenant != null) values['Tenant'] = body.tenant;
+  if (body.room != null) values['Room'] = body.room;
+
+  // Igual que appendRow: "Tenants" repite "Tenant" dos veces — solo se
+  // escribe en la PRIMERA columna con ese nombre, para no pisar el resumen
+  // lateral de Room 2 que vive en la segunda.
+  const seenWrite = {};
+  v.headers.forEach(function (h, c) {
+    if (h && Object.prototype.hasOwnProperty.call(values, h) && !seenWrite[h]) {
+      seenWrite[h] = true;
+      sheet.getRange(v.rowNum, c + 1).setValue(values[h]);
+    }
+  });
+  return { ok: true };
+}
+
+// "Borrar" no elimina la fila (sheet.deleteRow correría el riesgo de
+// arrastrar filas de abajo hacia arriba y, en "Tenants", de destruir datos
+// del resumen lateral de Room 2 que vive en las mismas filas que el
+// registro) — en vez de eso, VACÍA solo las columnas del registro. Las
+// funciones de resumen ya ignoran filas con Amount vacío.
+function clearRecordRow(sheet, body) {
+  const v = validateRecordRow(sheet, body);
+  if (!v.ok) return v;
+
+  const clearable = ['Date', 'Amount', 'Payment Method', 'Type', 'Detail', 'Tenant', 'Room'];
+  const seenWrite = {};
+  v.headers.forEach(function (h, c) {
+    if (h && clearable.indexOf(h) !== -1 && !seenWrite[h]) {
+      seenWrite[h] = true;
+      sheet.getRange(v.rowNum, c + 1).setValue('');
+    }
+  });
+  return { ok: true };
+}
+
 // "2026-08-04" (input type=date) -> "04/08/2026" o "04/08/26" según fmt.
 function formatIsoDate(isoStr, fmt) {
   const m = String(isoStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -698,7 +788,11 @@ function lastRows(ss, sheetName, n) {
   if (lastRow <= headerRow) return [];
   const startRow = Math.max(headerRow + 1, lastRow - n + 1);
   const values = sheet.getRange(startRow, 1, lastRow - startRow + 1, lastCol).getValues();
-  return values.reverse().map(function (row) { return rowToObject(headers, row); });
+  return values.map(function (row, i) {
+    const obj = rowToObject(headers, row);
+    obj.__row = startRow + i; // fila real en la hoja — usada para editar/borrar
+    return obj;
+  }).reverse();
 }
 
 // Se queda con la PRIMERA columna que tenga cada nombre de encabezado
