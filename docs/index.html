@@ -65,12 +65,15 @@
   }
   header h1 { font-size: 17px; margin: 0; font-weight: 700; }
   header .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .header-actions { display: flex; gap: 8px; }
   .gear {
     width: 36px; height: 36px; border-radius: 10px;
     border: 1px solid var(--line); background: var(--card);
     display: flex; align-items: center; justify-content: center;
     font-size: 17px; cursor: pointer; color: var(--ink-2);
   }
+  .gear.spinning { animation: gear-spin 0.7s linear infinite; pointer-events: none; opacity: 0.6; }
+  @keyframes gear-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   main { max-width: 480px; margin: 0 auto; padding: 16px; }
 
   .tabs {
@@ -291,7 +294,10 @@
     <h1>10 Smiths Avenue</h1>
     <div class="sub">Registro rápido — Redcliffe</div>
   </div>
-  <div class="gear" id="gearBtn">⚙</div>
+  <div class="header-actions">
+    <div class="gear" id="refreshBtn" title="Actualizar">↻</div>
+    <div class="gear" id="gearBtn" title="Conexión">⚙</div>
+  </div>
 </header>
 
 <main>
@@ -727,6 +733,16 @@
   });
 
   if (!cfg.url) { setTimeout(openSettings, 300); }
+
+  // ---- botón de actualizar (header) ----
+  var refreshBtn = document.getElementById('refreshBtn');
+  refreshBtn.addEventListener('click', function () {
+    if (!cfg.url) { openSettings(); return; }
+    refreshBtn.classList.add('spinning');
+    Promise.all([loadTenantsRegistry(), loadAllAndRenderActive()]).finally(function () {
+      refreshBtn.classList.remove('spinning');
+    });
+  });
 
   // ---- arrendatarios: modal ----
   var roommateOverlay = document.getElementById('roommateOverlay');
