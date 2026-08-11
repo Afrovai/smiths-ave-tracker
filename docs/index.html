@@ -1324,7 +1324,7 @@
     el.innerHTML =
       '<div class="kpi-tile"><span class="l">Cobrado a inquilinos</span><span class="v">' + money(bp.cobradoATenants) + '</span></div>' +
       '<div class="kpi-tile"><span class="l">Pagado + gastado</span><span class="v">' + money(bp.pagadoALandlord + bp.gastadoEnCasa) + '</span></div>' +
-      '<div class="kpi-tile"><span class="l">Margen neto</span><span class="v ' + (bp.margenNeto >= 0 ? 'good' : 'bad') + '">' + money(bp.margenNeto) + '</span></div>';
+      '<div class="kpi-tile"><span class="l">Margen neto (sin bond)</span><span class="v ' + (bp.margenNetoSinBond >= 0 ? 'good' : 'bad') + '">' + money(bp.margenNetoSinBond) + '</span></div>';
   }
 
   // Lista de barras horizontales de una sola serie (todas el mismo hue —

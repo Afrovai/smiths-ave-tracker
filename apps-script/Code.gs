@@ -461,7 +461,18 @@ function computeSummary(ss) {
       cobradoATenants: totalPaidByTenants,
       pagadoALandlord: round2(landlordTotal),
       gastadoEnCasa: round2(expenseTotal),
-      margenNeto: round2(totalPaidByTenants - landlordTotal - expenseTotal)
+      // Incluye bond de ambos lados (recibido de tenants, pagado al
+      // arrendador) — no es un margen "limpio", se deja solo por si algo
+      // más lo usa. El KPI del Dashboard usa margenNetoSinBond.
+      margenNeto: round2(totalPaidByTenants - landlordTotal - expenseTotal),
+      // El bond no es plata ganada ni gastada de verdad (es un depósito
+      // que se devuelve), así que se saca de ambos lados para que el
+      // margen refleje el flujo de caja real del día a día.
+      margenNetoSinBond: round2(
+        (totalPaidByTenants - (paidByType['Bond Held'] || 0)) -
+        (landlordTotal - (landlordByType['Bond'] || 0)) -
+        expenseTotal
+      )
     }
   };
 }

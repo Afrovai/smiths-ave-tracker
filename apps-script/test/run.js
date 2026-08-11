@@ -389,6 +389,32 @@ section('15. Rent Paid from Nico calculado EN VIVO (confirmado por Nicolás: = r
 }
 
 // ---------------------------------------------------------------
+section('16. Margen neto sin bond — el bond no debe distorsionar el flujo de caja real');
+{
+  const ss = new MockSpreadsheet();
+  ss._seed('Tenants', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail', 'Room', 'Tenant']]);
+  ss._seed('To Landlord', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail']]);
+  ss._seed('Expenses', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail']]);
+  const sandbox = loadCode(buildSandbox(ss));
+
+  // Renta real: tenant paga 1000, Nico paga 800 al landlord, gasto de casa 100.
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantPayment', date: '2026-05-01', amount: 1000, tenant: 'Margin Test', type: 'Rent' });
+  callDoPost(sandbox, { secret: SECRET, action: 'addLandlordPayment', date: '2026-05-01', amount: 800, type: 'Rent' });
+  callDoPost(sandbox, { secret: SECRET, action: 'addExpense', date: '2026-05-01', amount: 100, type: 'House', autoSplit: false });
+  // Bond: tenant deposita 500, pero Nico todavía no le ha pasado todo al
+  // landlord (solo 300) — a propósito DISTINTO en cada lado, para probar
+  // que excluir el bond realmente cambia el resultado (si fueran iguales
+  // se cancelarían solos y el test no probaría nada).
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantPayment', date: '2026-05-01', amount: 500, tenant: 'Margin Test', type: 'Bond Held' });
+  callDoPost(sandbox, { secret: SECRET, action: 'addLandlordPayment', date: '2026-05-01', amount: 300, type: 'Bond' });
+
+  const res = callDoGet(sandbox, { secret: SECRET, summary: '1' });
+  const bp = res.summary.bigPicture;
+  check('margenNeto (con bond) = 300 (1500 - 1100 - 100)', bp.margenNeto === 300, bp);
+  check('margenNetoSinBond = 100 (1000 - 800 - 100, el bond no debe aparecer)', bp.margenNetoSinBond === 100, bp);
+}
+
+// ---------------------------------------------------------------
 console.log('\n' + '='.repeat(50));
 console.log(pass + ' OK, ' + fail + ' FAIL');
 if (fail) process.exit(1);
