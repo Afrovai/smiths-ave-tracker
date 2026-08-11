@@ -75,7 +75,7 @@
   }
   .tabs::-webkit-scrollbar { display: none; }
   .tab {
-    flex: 0 0 auto; padding: 10px 14px; text-align: center; font-size: 12.5px; font-weight: 600;
+    flex: 0 0 auto; padding: 10px 18px; text-align: center; font-size: 13px; font-weight: 600;
     border-radius: 9px; border: 1px solid var(--line); background: var(--card);
     color: var(--ink-2); cursor: pointer; white-space: nowrap;
   }
@@ -121,69 +121,59 @@
   .banner.ok { display: block; background: var(--good-wash); color: var(--good); }
   .banner.err { display: block; background: var(--bad-wash); color: var(--bad); }
 
-  .recent { margin-top: 22px; }
-  .recent h2 { font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 10px; }
-  .recent-item {
-    display: flex; justify-content: space-between; gap: 10px; padding: 10px 0;
-    border-bottom: 1px solid var(--line); font-size: 13.5px;
+  .section-title {
+    font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
+    margin: 22px 0 10px; display: flex; justify-content: space-between; align-items: baseline;
   }
-  .recent-item .l { color: var(--ink-2); }
-  .recent-item .r { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
-  .recent-item .r.pending { color: var(--pending); }
-  .recent-empty { font-size: 13px; color: var(--muted); padding: 6px 0; }
+  .section-title .tot { color: var(--ink); font-size: 13px; font-weight: 700; text-transform: none; letter-spacing: 0; }
+  .section-title:first-of-type { margin-top: 4px; }
 
-  /* ---------- dashboard ---------- */
-  .dash-loading, .dash-empty { font-size: 13px; color: var(--muted); padding: 10px 0; }
-  .dash-stats {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 18px;
-  }
-  .dash-stat {
-    background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
-    padding: 12px 10px; display: flex; flex-direction: column; gap: 3px;
-  }
-  .dash-stat .l { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
-  .dash-stat .v { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .dash-stat .v.pos { color: var(--good); }
-  .dash-stat .v.neg { color: var(--bad); }
-
-  .dash-section { margin-bottom: 20px; }
-  .dash-section h3 {
-    font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
-    margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline;
-  }
-  .dash-section h3 .tot { color: var(--ink); font-size: 13px; font-weight: 700; text-transform: none; letter-spacing: 0; }
-
-  .bar-row { margin-bottom: 9px; }
-  .bar-row .top { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; }
-  .bar-row .top .name { color: var(--ink-2); }
-  .bar-row .top .amt { font-weight: 700; font-variant-numeric: tabular-nums; }
-  .bar-track { height: 7px; border-radius: 4px; background: var(--line); overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 4px; background: var(--accent); }
+  .dash-empty, .recent-empty { font-size: 13px; color: var(--muted); padding: 6px 0; }
 
   .tenant-card {
     border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--bg);
   }
   .tenant-card .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
   .tenant-card .name { font-weight: 700; font-size: 14px; }
-  .tenant-card .paid { font-size: 14px; font-weight: 700; color: var(--good); font-variant-numeric: tabular-nums; }
-  .tenant-card .pending-line { font-size: 12.5px; color: var(--pending); margin-bottom: 6px; }
+  .tenant-card .room-badge { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+  .tenant-card .pending-line { font-size: 12.5px; color: var(--pending); margin-top: 6px; }
   .tenant-card .breakdown { display: flex; flex-wrap: wrap; gap: 6px; }
   .tenant-card .chip {
     font-size: 11px; padding: 3px 8px; border-radius: 100px; background: var(--card);
     border: 1px solid var(--line); color: var(--ink-2); font-variant-numeric: tabular-nums;
   }
-  .dash-refresh {
-    font-size: 12px; color: var(--accent); text-align: right; margin-bottom: 12px; cursor: pointer; font-weight: 600;
+
+  .auto-row { display: flex; justify-content: space-between; font-size: 13.5px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .auto-row .n { color: var(--ink-2); }
+  .auto-row .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .auto-row.total .n { font-weight: 700; color: var(--ink); }
+  .auto-row.total { border-top: 2px solid var(--line); border-bottom: none; margin-top: 4px; padding-top: 12px; }
+  .auto-note { font-size: 11px; color: var(--muted); margin: -2px 0 8px; }
+
+  .history-item {
+    display: flex; justify-content: space-between; gap: 10px; padding: 10px 0;
+    border-bottom: 1px solid var(--line); font-size: 13.5px; cursor: pointer;
+  }
+  .history-item .l { color: var(--ink-2); }
+  .history-item .r { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; white-space: nowrap; }
+  .history-item .r.pending { color: var(--pending); }
+  .history-detail {
+    display: none; font-size: 12.5px; color: var(--ink-2); padding: 8px 10px; margin-top: -1px;
+    background: var(--bg); border-radius: 0 0 8px 8px; border-bottom: 1px solid var(--line);
+  }
+  .history-detail.show { display: block; }
+
+  .link-btn {
+    font-size: 12.5px; color: var(--accent); font-weight: 700; cursor: pointer;
+    text-align: right; margin: -6px 0 2px;
   }
 
-  /* ---------- registro de arrendatarios ---------- */
+  /* ---------- registro de arrendatarios (modal) ---------- */
   input[type="file"] { padding: 9px; font-size: 13px; }
   .file-status { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
-  .roommate-list { margin-top: 22px; }
-  .roommate-list h2 { font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 10px; }
   .roommate-card {
     border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
-    background: var(--card); cursor: pointer;
+    background: var(--bg); cursor: pointer;
   }
   .roommate-card .head { display: flex; justify-content: space-between; align-items: baseline; }
   .roommate-card .name { font-weight: 700; font-size: 14px; }
@@ -200,10 +190,6 @@
     padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg);
     color: var(--ink-2); font-size: 13px; font-weight: 600; cursor: pointer;
   }
-  .auto-note { font-size: 11px; color: var(--muted); margin-top: -4px; margin-bottom: 10px; }
-  .auto-row { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-bottom: 1px solid var(--line); }
-  .auto-row .n { color: var(--ink-2); }
-  .auto-row .v { font-weight: 700; font-variant-numeric: tabular-nums; }
 
   .overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none;
@@ -213,6 +199,7 @@
   .sheet {
     background: var(--card); width: 100%; max-width: 480px; border-radius: 16px 16px 0 0;
     padding: 20px 18px 26px; display: flex; flex-direction: column; gap: 12px;
+    max-height: 88vh; overflow-y: auto;
   }
   .sheet h2 { margin: 0 0 4px; font-size: 16px; }
   .sheet .hint { font-size: 12px; color: var(--muted); margin-top: -6px; }
@@ -262,15 +249,115 @@
 
 <main>
   <div class="tabs">
-    <div class="tab active" data-tab="expense">Gasto</div>
-    <div class="tab" data-tab="tenant">Arriendo</div>
-    <div class="tab" data-tab="landlord">Al dueño</div>
-    <div class="tab" data-tab="roommate">Arrendatarios</div>
-    <div class="tab" data-tab="dashboard">Resumen</div>
+    <div class="tab active" data-tab="tenant">Tenant</div>
+    <div class="tab" data-tab="landlord">Landlord</div>
+    <div class="tab" data-tab="expense">Expenses</div>
   </div>
 
+  <!-- TENANT -->
+  <form class="card active" id="form-tenant">
+    <div class="link-btn" id="openRoommateBtn">Gestionar arrendatarios (agregar / editar ficha) ›</div>
+    <div class="row2">
+      <div>
+        <label>Fecha</label>
+        <input type="date" name="date" required>
+      </div>
+      <div>
+        <label>Monto (AUD)</label>
+        <input type="number" name="amount" step="0.01" min="0" placeholder="0.00" required>
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>Método de pago</label>
+        <select name="paymentMethod">
+          <option>Transfer</option>
+          <option>Cash</option>
+        </select>
+      </div>
+      <div>
+        <label>Tipo</label>
+        <select name="type">
+          <option>Rent</option>
+          <option>Electricity</option>
+          <option>Water</option>
+          <option>Gas</option>
+          <option>Internet</option>
+          <option>Bond Held</option>
+          <option>Refund</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>Room</label>
+        <select name="room">
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
+      </div>
+      <div>
+        <label>Inquilino</label>
+        <input type="text" name="tenant" list="tenantList" required>
+      </div>
+    </div>
+    <div>
+      <label>Detalle</label>
+      <input type="text" name="detail" placeholder="Ej: 09/03/26 - 22/03/26">
+    </div>
+    <button type="submit" class="submit">Registrar</button>
+    <div class="banner" id="banner-tenant"></div>
+
+    <div class="section-title">Resumen por arrendatario</div>
+    <div id="tenantSummary"><div class="dash-empty">Configura la conexión (⚙) para ver esto.</div></div>
+
+    <div class="section-title">Historial</div>
+    <div id="tenantHistory"></div>
+  </form>
+
+  <!-- LANDLORD -->
+  <form class="card" id="form-landlord">
+    <div class="row2">
+      <div>
+        <label>Fecha</label>
+        <input type="date" name="date" required>
+      </div>
+      <div>
+        <label>Monto (AUD)</label>
+        <input type="number" name="amount" step="0.01" min="0" placeholder="0.00" required>
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>Método de pago</label>
+        <select name="paymentMethod">
+          <option>Transfer</option>
+          <option>Cash</option>
+        </select>
+      </div>
+      <div>
+        <label>Tipo</label>
+        <select name="type">
+          <option>Rent</option>
+          <option>Bond</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <label>Detalle</label>
+      <input type="text" name="detail" placeholder="Ej: 07/07/26 - 21/07/26">
+    </div>
+    <button type="submit" class="submit">Registrar</button>
+    <div class="banner" id="banner-landlord"></div>
+
+    <div class="section-title">Resumen</div>
+    <div id="landlordSummary"><div class="dash-empty">Configura la conexión (⚙) para ver esto.</div></div>
+  </form>
+
   <!-- EXPENSE -->
-  <form class="card active" id="form-expense">
+  <form class="card" id="form-expense">
     <div class="row2">
       <div>
         <label>Fecha</label>
@@ -330,175 +417,15 @@
       <div class="split-preview" id="splitPreviewText"></div>
     </div>
 
-    <button type="submit" class="submit">Registrar gasto</button>
+    <button type="submit" class="submit">Registrar</button>
     <div class="banner" id="banner-expense"></div>
+
+    <div class="section-title">Totales</div>
+    <div id="expenseSummary"><div class="dash-empty">Configura la conexión (⚙) para ver esto.</div></div>
+
+    <div class="section-title">Historial</div>
+    <div id="expenseHistory"></div>
   </form>
-
-  <!-- TENANT -->
-  <form class="card" id="form-tenant">
-    <div class="row2">
-      <div>
-        <label>Fecha</label>
-        <input type="date" name="date" required>
-      </div>
-      <div>
-        <label>Monto (AUD)</label>
-        <input type="number" name="amount" step="0.01" min="0" placeholder="0.00" required>
-      </div>
-    </div>
-    <div class="row2">
-      <div>
-        <label>Método de pago</label>
-        <select name="paymentMethod">
-          <option>Transfer</option>
-          <option>Cash</option>
-        </select>
-      </div>
-      <div>
-        <label>Tipo</label>
-        <select name="type">
-          <option>Rent</option>
-          <option>Bond Held</option>
-          <option>Refund</option>
-          <option>Other</option>
-        </select>
-      </div>
-    </div>
-    <div class="row2">
-      <div>
-        <label>Room</label>
-        <select name="room">
-          <option value="1">1</option>
-          <option value="2">2</option>
-        </select>
-      </div>
-      <div>
-        <label>Inquilino</label>
-        <input type="text" name="tenant" list="tenantList" required>
-      </div>
-    </div>
-    <div>
-      <label>Detalle</label>
-      <input type="text" name="detail" placeholder="Ej: 09/03/26 - 22/03/26">
-    </div>
-    <button type="submit" class="submit">Registrar pago de arriendo</button>
-    <div class="banner" id="banner-tenant"></div>
-  </form>
-
-  <!-- LANDLORD -->
-  <form class="card" id="form-landlord">
-    <div class="row2">
-      <div>
-        <label>Fecha</label>
-        <input type="date" name="date" required>
-      </div>
-      <div>
-        <label>Monto (AUD)</label>
-        <input type="number" name="amount" step="0.01" min="0" placeholder="0.00" required>
-      </div>
-    </div>
-    <div class="row2">
-      <div>
-        <label>Método de pago</label>
-        <select name="paymentMethod">
-          <option>Transfer</option>
-          <option>Cash</option>
-        </select>
-      </div>
-      <div>
-        <label>Tipo</label>
-        <select name="type">
-          <option>Rent</option>
-          <option>Bond</option>
-          <option>Other</option>
-        </select>
-      </div>
-    </div>
-    <div>
-      <label>Detalle</label>
-      <input type="text" name="detail" placeholder="Ej: 07/07/26 - 21/07/26">
-    </div>
-    <button type="submit" class="submit">Registrar pago al dueño</button>
-    <div class="banner" id="banner-landlord"></div>
-  </form>
-
-  <!-- ROOMMATE -->
-  <form class="card" id="form-roommate">
-    <div class="form-note">Vuelve a guardar con el mismo nombre para editar una ficha existente.</div>
-    <div>
-      <label>Nombre</label>
-      <input type="text" name="name" id="rmName" required>
-    </div>
-    <div class="row2">
-      <div>
-        <label>Pieza</label>
-        <select name="room" id="rmRoom">
-          <option value="Pieza 1">Pieza 1 (chica, $280/sem)</option>
-          <option value="Pieza 2">Pieza 2 (grande, $390/sem)</option>
-        </select>
-      </div>
-      <div>
-        <label>Renta ($/semana)</label>
-        <input type="number" name="rent" id="rmRent" step="0.01" min="0">
-      </div>
-    </div>
-    <div class="row2">
-      <div>
-        <label>Frecuencia de pago</label>
-        <select name="frequency" id="rmFrequency">
-          <option>Semanal</option>
-          <option>Quincenal</option>
-          <option>Mensual</option>
-        </select>
-      </div>
-      <div>
-        <label>Estado</label>
-        <select name="status" id="rmStatus">
-          <option>Activo</option>
-          <option>Inactivo</option>
-        </select>
-      </div>
-    </div>
-    <label class="toggle-row"><input type="checkbox" name="paysUtilities" id="rmPaysUtilities"> Paga servicios (luz/agua/gas/internet)</label>
-    <div class="row2">
-      <div>
-        <label>Bond — monto</label>
-        <input type="number" name="bondAmount" id="rmBondAmount" step="0.01" min="0">
-      </div>
-      <div>
-        <label>Bond — fecha</label>
-        <input type="date" name="bondDate" id="rmBondDate">
-      </div>
-    </div>
-    <div>
-      <label>Bond — detalle</label>
-      <input type="text" name="bondDetail" id="rmBondDetail" placeholder="Ej: 3 semanas de bond">
-    </div>
-    <div>
-      <label>Foto de ID</label>
-      <input type="file" accept="image/*" id="rmIdPhoto">
-      <div class="file-status" id="rmIdPhotoStatus"></div>
-    </div>
-    <div>
-      <label>Comprobante de ingreso</label>
-      <input type="file" accept="image/*,application/pdf" id="rmIncomeProof">
-      <div class="file-status" id="rmIncomeProofStatus"></div>
-    </div>
-    <button type="submit" class="submit">Guardar arrendatario</button>
-    <button type="button" class="secondary" id="rmClear">Limpiar formulario (nueva ficha)</button>
-    <div class="banner" id="banner-roommate"></div>
-
-    <div class="roommate-list">
-      <h2>Fichas guardadas</h2>
-      <div id="roommateList"><div class="recent-empty">Configura la conexión (⚙) para ver esto.</div></div>
-    </div>
-  </form>
-
-  <!-- DASHBOARD -->
-  <div class="card" id="form-dashboard">
-    <div class="dash-refresh" id="dashRefresh">↻ Actualizar</div>
-    <div id="dashContent"><div class="dash-loading">Cargando…</div></div>
-  </div>
 
   <datalist id="tenantList">
     <option value="Juan Plata">
@@ -506,11 +433,6 @@
     <option value="Krishna">
     <option value="Annapaula">
   </datalist>
-
-  <div class="recent">
-    <h2>Actividad reciente</h2>
-    <div id="recentList"><div class="recent-empty">Configura la conexión (⚙) para ver esto.</div></div>
-  </div>
 </main>
 
 <div class="overlay" id="overlay">
@@ -530,13 +452,91 @@
   </div>
 </div>
 
+<div class="overlay" id="roommateOverlay">
+  <div class="sheet">
+    <h2>Arrendatarios</h2>
+    <div class="form-note">Vuelve a guardar con el mismo nombre para editar una ficha existente.</div>
+    <form id="form-roommate">
+      <div>
+        <label>Nombre</label>
+        <input type="text" name="name" id="rmName" required>
+      </div>
+      <div class="row2">
+        <div>
+          <label>Pieza</label>
+          <select name="room" id="rmRoom">
+            <option value="Pieza 1">Pieza 1 (chica, $280/sem)</option>
+            <option value="Pieza 2">Pieza 2 (grande, $390/sem)</option>
+          </select>
+        </div>
+        <div>
+          <label>Renta ($/semana)</label>
+          <input type="number" name="rent" id="rmRent" step="0.01" min="0">
+        </div>
+      </div>
+      <div class="row2">
+        <div>
+          <label>Frecuencia de pago</label>
+          <select name="frequency" id="rmFrequency">
+            <option>Semanal</option>
+            <option>Quincenal</option>
+            <option>Mensual</option>
+          </select>
+        </div>
+        <div>
+          <label>Estado</label>
+          <select name="status" id="rmStatus">
+            <option>Activo</option>
+            <option>Inactivo</option>
+          </select>
+        </div>
+      </div>
+      <label class="toggle-row"><input type="checkbox" name="paysUtilities" id="rmPaysUtilities"> Paga servicios (luz/agua/gas/internet)</label>
+      <div class="row2">
+        <div>
+          <label>Bond — monto</label>
+          <input type="number" name="bondAmount" id="rmBondAmount" step="0.01" min="0">
+        </div>
+        <div>
+          <label>Bond — fecha</label>
+          <input type="date" name="bondDate" id="rmBondDate">
+        </div>
+      </div>
+      <div>
+        <label>Bond — detalle</label>
+        <input type="text" name="bondDetail" id="rmBondDetail" placeholder="Ej: 3 semanas de bond">
+      </div>
+      <div>
+        <label>Foto de ID</label>
+        <input type="file" accept="image/*" id="rmIdPhoto">
+        <div class="file-status" id="rmIdPhotoStatus"></div>
+      </div>
+      <div>
+        <label>Comprobante de ingreso</label>
+        <input type="file" accept="image/*,application/pdf" id="rmIncomeProof">
+        <div class="file-status" id="rmIncomeProofStatus"></div>
+      </div>
+      <div class="actions">
+        <button type="button" class="secondary" id="rmClear">Nueva ficha</button>
+        <button type="submit" class="primary">Guardar</button>
+      </div>
+      <div class="banner" id="banner-roommate"></div>
+    </form>
+
+    <div class="section-title">Fichas guardadas</div>
+    <div id="roommateList"><div class="dash-empty">Configura la conexión (⚙) para ver esto.</div></div>
+
+    <button type="button" id="roommateClose">Cerrar</button>
+  </div>
+</div>
+
 <script>
 (function () {
   // ---- PIN lock ----
   // Barrera simple, no es seguridad real: cualquiera que revise el código
   // fuente de esta página (pública en GitHub Pages) puede ver el PIN. Solo
   // evita que alguien que llega al link por casualidad entre y use la app.
-  var LOCK_PIN = '468023';
+  var LOCK_PIN = '111111';
   var LOCK_KEY = 'smithsAveUnlocked';
   var lockScreen = document.getElementById('lockScreen');
   var lockInput = document.getElementById('lockInput');
@@ -546,8 +546,8 @@
   function unlock() {
     document.body.classList.remove('locked');
     lockScreen.classList.add('hide');
-    refreshRecent();
     loadTenantsRegistry();
+    loadAllAndRenderActive();
   }
   function tryUnlock() {
     if (lockInput.value === LOCK_PIN) {
@@ -595,22 +595,32 @@
     saveConfig(cfg);
     overlay.classList.remove('show');
     document.getElementById('splitTenant').value = cfg.defaultTenant;
-    refreshRecent();
+    loadTenantsRegistry();
+    loadAllAndRenderActive();
   });
 
   if (!cfg.url) { setTimeout(openSettings, 300); }
 
+  // ---- arrendatarios: modal ----
+  var roommateOverlay = document.getElementById('roommateOverlay');
+  document.getElementById('openRoommateBtn').addEventListener('click', function () {
+    roommateOverlay.classList.add('show');
+    loadRoommates();
+  });
+  document.getElementById('roommateClose').addEventListener('click', function () { roommateOverlay.classList.remove('show'); });
+
   // ---- tabs ----
   var tabs = document.querySelectorAll('.tab');
   var cards = document.querySelectorAll('.card');
+  var activeTab = 'tenant';
   tabs.forEach(function (t) {
     t.addEventListener('click', function () {
       tabs.forEach(function (x) { x.classList.remove('active'); });
       cards.forEach(function (x) { x.classList.remove('active'); });
       t.classList.add('active');
-      document.getElementById('form-' + t.dataset.tab).classList.add('active');
-      if (t.dataset.tab === 'dashboard') loadDashboard();
-      if (t.dataset.tab === 'roommate') loadRoommates();
+      activeTab = t.dataset.tab;
+      document.getElementById('form-' + activeTab).classList.add('active');
+      renderActiveTab();
     });
   });
 
@@ -639,15 +649,15 @@
     dl.innerHTML = active.map(function (t) { return '<option value="' + t['Nombre'] + '">'; }).join('');
   }
 
-  // Cuando escriben/eligen un inquilino conocido en la pestaña Arriendo,
-  // se autocompleta la pieza — evita tener que acordarse manualmente.
+  // Cuando escriben/eligen un inquilino conocido en la pestaña Tenant, se
+  // autocompleta la pieza — evita tener que acordarse manualmente.
   var tenantField = document.querySelector('#form-tenant input[name="tenant"]');
   var roomField = document.querySelector('#form-tenant select[name="room"]');
+  var ROOM_TO_NUMBER_JS = { 'Pieza 1': '1', 'Pieza 2': '2' };
   tenantField.addEventListener('input', function () {
     var match = tenantsRegistry.find(function (t) { return t['Nombre'] === tenantField.value; });
     if (match && match['Pieza']) roomField.value = String(ROOM_TO_NUMBER_JS[match['Pieza']] || '');
   });
-  var ROOM_TO_NUMBER_JS = { 'Pieza 1': '1', 'Pieza 2': '2' };
 
   // ---- expense split logic ----
   var SPLITTABLE = { Electricity: 0.5, Water: 0.5, Gas: 0.5, Internet: 0.5 };
@@ -747,7 +757,7 @@
         var extra = res.created.length > 1 ? ' + cobro pendiente creado' : '';
         showBanner('banner-expense', true, 'Registrado' + extra + '.');
         f.reset(); f.date.value = today; updateSplitUI();
-        refreshRecent();
+        loadAllAndRenderActive();
       } else { showBanner('banner-expense', false, res.error || 'Error'); }
     }).catch(function (e) { showBanner('banner-expense', false, String(e)); });
   });
@@ -760,7 +770,7 @@
       date: f.date.value, amount: f.amount.value, paymentMethod: f.paymentMethod.value,
       type: f.type.value, room: f.room.value, tenant: f.tenant.value, detail: f.detail.value
     }).then(function (res) {
-      if (res.ok) { showBanner('banner-tenant', true, 'Registrado.'); f.reset(); f.date.value = today; refreshRecent(); }
+      if (res.ok) { showBanner('banner-tenant', true, 'Registrado.'); f.reset(); f.date.value = today; loadAllAndRenderActive(); }
       else { showBanner('banner-tenant', false, res.error || 'Error'); }
     }).catch(function (e) { showBanner('banner-tenant', false, String(e)); });
   });
@@ -773,12 +783,12 @@
       date: f.date.value, amount: f.amount.value, paymentMethod: f.paymentMethod.value,
       type: f.type.value, detail: f.detail.value
     }).then(function (res) {
-      if (res.ok) { showBanner('banner-landlord', true, 'Registrado.'); f.reset(); f.date.value = today; refreshRecent(); }
+      if (res.ok) { showBanner('banner-landlord', true, 'Registrado.'); f.reset(); f.date.value = today; loadAllAndRenderActive(); }
       else { showBanner('banner-landlord', false, res.error || 'Error'); }
     }).catch(function (e) { showBanner('banner-landlord', false, String(e)); });
   });
 
-  // ---- registro de arrendatarios: formulario ----
+  // ---- registro de arrendatarios: formulario (dentro del modal) ----
   var rmRoom = document.getElementById('rmRoom');
   var rmRent = document.getElementById('rmRent');
   var rmFrequency = document.getElementById('rmFrequency');
@@ -859,6 +869,7 @@
         statusIncome.textContent = incomeFile ? 'Subida ✓' : '';
         loadTenantsRegistry();
         loadRoommates();
+        loadAllAndRenderActive();
       } else {
         showBanner('banner-roommate', false, res.error || 'Error');
       }
@@ -867,13 +878,13 @@
 
   function loadRoommates() {
     var list = document.getElementById('roommateList');
-    if (!cfg.url) { list.innerHTML = '<div class="recent-empty">Configura la conexión (⚙) para ver esto.</div>'; return; }
+    if (!cfg.url) { list.innerHTML = '<div class="dash-empty">Configura la conexión (⚙) para ver esto.</div>'; return; }
     var url = cfg.url + '?secret=' + encodeURIComponent(cfg.secret) + '&tenants=1';
     fetch(url).then(function (r) { return r.json(); }).then(function (res) {
-      if (!res.ok) { list.innerHTML = '<div class="recent-empty">' + (res.error || 'Error al cargar') + '</div>'; return; }
+      if (!res.ok) { list.innerHTML = '<div class="dash-empty">' + (res.error || 'Error al cargar') + '</div>'; return; }
       tenantsRegistry = res.tenants || [];
       populateTenantDatalist();
-      if (!tenantsRegistry.length) { list.innerHTML = '<div class="recent-empty">Sin fichas todavía — usa el formulario de arriba.</div>'; return; }
+      if (!tenantsRegistry.length) { list.innerHTML = '<div class="dash-empty">Sin fichas todavía — usa el formulario de arriba.</div>'; return; }
       list.innerHTML = tenantsRegistry.map(function (t, i) {
         var inactive = t['Estado'] !== 'Activo';
         var docs = '';
@@ -898,154 +909,157 @@
           document.getElementById('rmPaysUtilities').checked = t['Paga Servicios'] === 'Sí';
           document.getElementById('rmBondAmount').value = t['Bond Monto'] || '';
           document.getElementById('rmBondDetail').value = t['Bond Detalle'] || '';
-          window.scrollTo({ top: 0, behavior: 'smooth' });
         });
       });
-    }).catch(function () { list.innerHTML = '<div class="recent-empty">No se pudo conectar.</div>'; });
+    }).catch(function () { list.innerHTML = '<div class="dash-empty">No se pudo conectar.</div>'; });
   }
 
-  // ---- recent activity ----
-  function refreshRecent() {
-    var list = document.getElementById('recentList');
-    if (!cfg.url) { list.innerHTML = '<div class="recent-empty">Configura la conexión (⚙) para ver esto.</div>'; return; }
-    var url = cfg.url + '?secret=' + encodeURIComponent(cfg.secret) + '&recent=4';
-    fetch(url).then(function (r) { return r.json(); }).then(function (res) {
-      if (!res.ok) { list.innerHTML = '<div class="recent-empty">' + (res.error || 'Error al cargar') + '</div>'; return; }
-      var rows = [];
-      ['Expenses', 'Tenants', 'To Landlord'].forEach(function (sheet) {
-        (res.recent[sheet] || []).forEach(function (r) {
-          rows.push({ sheet: sheet, date: r['Date'], amount: r['Amount'], detail: r['Detail'] || r['Tenant'] || '', pending: r['Payment Method'] === 'Pending' });
-        });
-      });
-      if (!rows.length) { list.innerHTML = '<div class="recent-empty">Sin movimientos todavía.</div>'; return; }
-      list.innerHTML = rows.slice(0, 6).map(function (r) {
-        return '<div class="recent-item"><span class="l">' + r.sheet + ' · ' + (r.date || '') + '<br>' + (r.detail || '') + '</span>' +
-               '<span class="r' + (r.pending ? ' pending' : '') + '">$' + r.amount + '</span></div>';
-      }).join('');
-    }).catch(function () { list.innerHTML = '<div class="recent-empty">No se pudo conectar.</div>'; });
-  }
-  if (sessionStorage.getItem(LOCK_KEY) === '1') { refreshRecent(); loadTenantsRegistry(); }
-
-  // ---- dashboard ----
-  document.getElementById('dashRefresh').addEventListener('click', loadDashboard);
-
+  // ---- resumen + historial por tab ----
   function money(n) {
     n = Number(n) || 0;
     return (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('es-CL', { maximumFractionDigits: 2 });
   }
+  function round2(n) { return Math.round(n * 100) / 100; }
 
-  function loadDashboard() {
-    var el = document.getElementById('dashContent');
-    if (!cfg.url) { el.innerHTML = '<div class="dash-empty">Configura la conexión (⚙) primero.</div>'; return; }
-    el.innerHTML = '<div class="dash-loading">Cargando…</div>';
-    var url = cfg.url + '?secret=' + encodeURIComponent(cfg.secret) + '&summary=1';
-    fetch(url).then(function (r) { return r.json(); }).then(function (res) {
-      if (!res.ok) { el.innerHTML = '<div class="dash-empty">' + (res.error || 'Error al cargar') + '</div>'; return; }
-      renderDashboard(res.summary);
-    }).catch(function () { el.innerHTML = '<div class="dash-empty">No se pudo conectar.</div>'; });
+  var latestSummary = null;
+  var historyTenants = [];
+  var historyExpenses = [];
+
+  function loadAllAndRenderActive() {
+    if (!cfg.url) { renderActiveTab(); return Promise.resolve(); }
+    return Promise.all([loadSummary(), loadHistory()]).then(renderActiveTab);
   }
 
-  function barList(obj, opts) {
-    opts = opts || {};
-    var entries = Object.keys(obj).map(function (k) { return [k, obj[k]]; }).filter(function (e) { return e[1] !== 0; });
-    entries.sort(function (a, b) { return b[1] - a[1]; });
-    if (!entries.length) return '<div class="dash-empty">Sin movimientos.</div>';
-    var max = Math.max.apply(null, entries.map(function (e) { return Math.abs(e[1]); }));
-    return entries.map(function (e) {
-      var pct = max ? Math.max(4, Math.round(Math.abs(e[1]) / max * 100)) : 0;
-      return '<div class="bar-row"><div class="top"><span class="name">' + e[0] + '</span><span class="amt">' + money(e[1]) + '</span></div>' +
-             '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%; background:' + (opts.color || 'var(--accent)') + '"></div></div></div>';
+  function loadSummary() {
+    var url = cfg.url + '?secret=' + encodeURIComponent(cfg.secret) + '&summary=1';
+    return fetch(url).then(function (r) { return r.json(); }).then(function (res) {
+      latestSummary = res.ok ? res.summary : null;
+    }).catch(function () { latestSummary = null; });
+  }
+
+  function loadHistory() {
+    var url = cfg.url + '?secret=' + encodeURIComponent(cfg.secret) + '&full=1';
+    return fetch(url).then(function (r) { return r.json(); }).then(function (res) {
+      if (res.ok) {
+        historyTenants = res.recent['Tenants'] || [];
+        historyExpenses = res.recent['Expenses'] || [];
+      }
+    }).catch(function () { historyTenants = []; historyExpenses = []; });
+  }
+
+  function renderActiveTab() {
+    if (activeTab === 'tenant') { renderTenantSummary(); renderTenantHistory(); }
+    else if (activeTab === 'landlord') { renderLandlordSummary(); }
+    else if (activeTab === 'expense') { renderExpenseSummary(); renderExpenseHistory(); }
+  }
+
+  function renderTenantSummary() {
+    var el = document.getElementById('tenantSummary');
+    if (!cfg.url) { el.innerHTML = '<div class="dash-empty">Configura la conexión (⚙) para ver esto.</div>'; return; }
+    if (!latestSummary) { el.innerHTML = '<div class="dash-empty">Cargando…</div>'; return; }
+    var active = tenantsRegistry.filter(function (t) { return t['Estado'] === 'Activo'; });
+    if (!active.length) { el.innerHTML = '<div class="dash-empty">Sin arrendatarios registrados — usa "Gestionar arrendatarios" arriba.</div>'; return; }
+    var paidByType = latestSummary.tenants.paidByTypePerTenant || {};
+    var bondByTenant = (latestSummary.bond || {}).byTenant || {};
+    var pendingByTenant = latestSummary.tenants.pendingByTenant || {};
+    el.innerHTML = active.map(function (t) {
+      var name = t['Nombre'];
+      var types = paidByType[name] || {};
+      var bond = bondByTenant[name];
+      var pending = pendingByTenant[name] || 0;
+      var chips = ['Rent', 'Electricity', 'Water', 'Internet', 'Gas'].map(function (ty) {
+        return '<span class="chip">' + ty + ' ' + money(types[ty] || 0) + '</span>';
+      }).join('');
+      return '<div class="tenant-card">' +
+        '<div class="head"><span class="name">' + name + '</span><span class="room-badge">' + (t['Pieza'] || '') + '</span></div>' +
+        '<div class="breakdown">' + chips + '</div>' +
+        (bond != null ? '<div class="auto-row" style="border:none;padding:8px 0 0"><span class="n">Bond a devolver</span><span class="v">' + money(bond) + '</span></div>' : '') +
+        (pending > 0 ? '<div class="pending-line">Pendiente de cobrar: ' + money(pending) + '</div>' : '') +
+        '</div>';
     }).join('');
   }
 
-  function renderDashboard(s) {
-    var el = document.getElementById('dashContent');
-    var bp = s.bigPicture;
-    var html = '';
-
-    html += '<div class="dash-stats">' +
-      '<div class="dash-stat"><span class="l">Cobrado a inquilinos</span><span class="v">' + money(bp.cobradoATenants) + '</span></div>' +
-      '<div class="dash-stat"><span class="l">Pagado + gastado</span><span class="v">' + money(bp.pagadoALandlord + bp.gastadoEnCasa) + '</span></div>' +
-      '<div class="dash-stat"><span class="l">Margen neto</span><span class="v ' + (bp.margenNeto >= 0 ? 'pos' : 'neg') + '">' + money(bp.margenNeto) + '</span></div>' +
-      '</div>';
-
-    if (s.tenants.totalPending > 0) {
-      html += '<div class="dash-section"><h3>Pendiente por cobrar<span class="tot" style="color:var(--pending)">' + money(s.tenants.totalPending) + '</span></h3>' +
-              barList(s.tenants.pendingByTenant, { color: 'var(--pending)' }) + '</div>';
-    }
-
-    html += '<div class="dash-section"><h3>Por pieza</h3>';
-    var rooms = Object.keys(s.byRoom || {});
-    if (!rooms.length) {
-      html += '<div class="dash-empty">Sin pagos registrados todavía.</div>';
-    } else {
-      rooms.sort(function (a, b) { return (s.byRoom[b].total || 0) - (s.byRoom[a].total || 0); });
-      rooms.forEach(function (r) {
-        var room = s.byRoom[r];
-        html += '<div class="tenant-card"><div class="head"><span class="name">' + r + '</span><span class="paid">' + money(room.total) + '</span></div>' +
-          '<div class="breakdown">' + Object.keys(room.byType).map(function (ty) {
-            return '<span class="chip">' + ty + ' ' + money(room.byType[ty]) + '</span>';
-          }).join('') + '</div></div>';
+  function renderTenantHistory() {
+    var el = document.getElementById('tenantHistory');
+    if (!cfg.url) { el.innerHTML = ''; return; }
+    if (!historyTenants.length) { el.innerHTML = '<div class="recent-empty">Sin movimientos todavía.</div>'; return; }
+    el.innerHTML = historyTenants.map(function (r, i) {
+      var pending = r['Payment Method'] === 'Pending';
+      return '<div class="history-item" data-idx="' + i + '">' +
+        '<span class="l">' + (r['Tenant'] || '—') + ' · ' + (r['Date'] || '') + '<br>' + (r['Type'] || '') + '</span>' +
+        '<span class="r' + (pending ? ' pending' : '') + '">' + money(r['Amount']) + '</span>' +
+        '</div>' +
+        '<div class="history-detail" id="tenantDetail' + i + '">' + (r['Detail'] || 'Sin detalle') + (pending ? ' · Pendiente de pago' : '') + '</div>';
+    }).join('');
+    el.querySelectorAll('.history-item').forEach(function (row) {
+      row.addEventListener('click', function () {
+        document.getElementById('tenantDetail' + row.dataset.idx).classList.toggle('show');
       });
-      if (rooms.indexOf('Sin pieza asignada') !== -1) {
-        html += '<div class="auto-note">"Sin pieza asignada" son movimientos antiguos que no tenían la columna Room llena en la planilla.</div>';
-      }
-    }
-    html += '</div>';
+    });
+  }
 
-    html += '<div class="dash-section"><h3>Por inquilino (pagado)<span class="tot">' + money(s.tenants.totalPaid) + '</span></h3>';
-    var tenantNames = Object.keys(s.tenants.byTypePerTenant);
-    if (!tenantNames.length) {
-      html += '<div class="dash-empty">Sin pagos registrados todavía.</div>';
-    } else {
-      tenantNames.sort(function (a, b) { return (s.tenants.paidByTenant[b] || 0) - (s.tenants.paidByTenant[a] || 0); });
-      tenantNames.forEach(function (t) {
-        var pending = s.tenants.pendingByTenant[t] || 0;
-        var profile = (s.registry || []).find(function (r) { return r['Nombre'] === t; });
-        html += '<div class="tenant-card"><div class="head"><span class="name">' + t + '</span><span class="paid">' + money(s.tenants.paidByTenant[t] || 0) + '</span></div>';
-        if (profile) {
-          html += '<div class="meta" style="margin-bottom:6px">' + profile['Pieza'] + ' · $' + profile['Renta'] + '/semana · ' + profile['Frecuencia'] +
-            ' · ' + (profile['Paga Servicios'] === 'Sí' ? 'paga servicios' : 'no paga servicios') +
-            (profile['Bond Monto'] ? ' · Bond $' + profile['Bond Monto'] + (profile['Bond Fecha'] ? ' (' + profile['Bond Fecha'] + ')' : '') : '') + '</div>';
-          var docs = '';
-          if (profile['Foto ID']) docs += '<a href="' + profile['Foto ID'] + '" target="_blank" rel="noopener">Ver ID</a>';
-          if (profile['Comprobante Ingreso']) docs += '<a href="' + profile['Comprobante Ingreso'] + '" target="_blank" rel="noopener">Ver ingreso</a>';
-          if (docs) html += '<div class="profile-docs" style="margin-bottom:6px">' + docs + '</div>';
-        }
-        if (pending > 0) html += '<div class="pending-line">Pendiente: ' + money(pending) + '</div>';
-        var byType = s.tenants.byTypePerTenant[t];
-        html += '<div class="breakdown">' + Object.keys(byType).map(function (ty) {
-          return '<span class="chip">' + ty + ' ' + money(byType[ty]) + '</span>';
-        }).join('') + '</div></div>';
+  function renderExpenseSummary() {
+    var el = document.getElementById('expenseSummary');
+    if (!cfg.url) { el.innerHTML = '<div class="dash-empty">Configura la conexión (⚙) para ver esto.</div>'; return; }
+    if (!latestSummary) { el.innerHTML = '<div class="dash-empty">Cargando…</div>'; return; }
+    var byType = latestSummary.expenses.byType || {};
+    var cats = ['House', 'Internet', 'Electricity', 'Gas', 'Water'];
+    el.innerHTML = cats.map(function (c) {
+      return '<div class="auto-row"><span class="n">' + c + '</span><span class="v">' + money(byType[c] || 0) + '</span></div>';
+    }).join('') + '<div class="auto-row total"><span class="n">Total gastado</span><span class="v">' + money(latestSummary.expenses.total || 0) + '</span></div>';
+  }
+
+  function renderExpenseHistory() {
+    var el = document.getElementById('expenseHistory');
+    if (!cfg.url) { el.innerHTML = ''; return; }
+    if (!historyExpenses.length) { el.innerHTML = '<div class="recent-empty">Sin movimientos todavía.</div>'; return; }
+    el.innerHTML = historyExpenses.map(function (r, i) {
+      return '<div class="history-item" data-idx="' + i + '">' +
+        '<span class="l">' + (r['Date'] || '') + ' · ' + (r['Type'] || '') + '</span>' +
+        '<span class="r">' + money(r['Amount']) + '</span>' +
+        '</div>' +
+        '<div class="history-detail" id="expenseDetail' + i + '">' + (r['Detail'] || 'Sin detalle') + ' · ' + (r['Payment Method'] || '') + '</div>';
+    }).join('');
+    el.querySelectorAll('.history-item').forEach(function (row) {
+      row.addEventListener('click', function () {
+        document.getElementById('expenseDetail' + row.dataset.idx).classList.toggle('show');
       });
+    });
+  }
+
+  function renderLandlordSummary() {
+    var el = document.getElementById('landlordSummary');
+    if (!cfg.url) { el.innerHTML = '<div class="dash-empty">Configura la conexión (⚙) para ver esto.</div>'; return; }
+    if (!latestSummary) { el.innerHTML = '<div class="dash-empty">Cargando…</div>'; return; }
+    var s = latestSummary;
+    var rentToLandlord = (s.landlord.byType && s.landlord.byType['Rent']) || 0;
+    var rentFromTenants = (s.tenants.paidByType && s.tenants.paidByType['Rent']) || 0;
+    var bondTotal = (s.bond && s.bond.totalHeld) || 0;
+    var room1 = (s.byRoom && s.byRoom['Pieza 1'] && s.byRoom['Pieza 1'].total) || 0;
+    var room2 = (s.byRoom && s.byRoom['Pieza 2'] && s.byRoom['Pieza 2'].total) || 0;
+    var rows = [
+      ['Renta pagada al arrendador', rentToLandlord],
+      ['Renta pagada por los tenants', rentFromTenants],
+      ['Bond total en mano', bondTotal],
+      ['Pieza 1 — total recibido', room1],
+      ['Pieza 2 — total recibido', room2]
+    ];
+    var html = rows.map(function (r) {
+      return '<div class="auto-row"><span class="n">' + r[0] + '</span><span class="v">' + money(r[1]) + '</span></div>';
+    }).join('');
+
+    var expected = s.landlord.expected;
+    if (expected) {
+      var diff = round2(rentToLandlord - expected.amount);
+      html += '<div class="section-title">Renta esperada <span class="tot">$1.600 / 2 semanas</span></div>' +
+        '<div class="auto-note">Calculada desde el primer pago registrado (' + expected.sinceDate + ') hasta hoy.</div>' +
+        '<div class="auto-row"><span class="n">Debería llevar pagado</span><span class="v">' + money(expected.amount) + '</span></div>' +
+        '<div class="auto-row total"><span class="n">Diferencia (real − esperado)</span><span class="v" style="color:' + (diff >= 0 ? 'var(--good)' : 'var(--bad)') + '">' + money(diff) + '</span></div>';
     }
-    html += '</div>';
-
-    html += '<div class="dash-section"><h3>Servicios cobrados a inquilinos</h3>' + barList(s.utilityChargedToTenants, { color: 'var(--s-2, var(--accent))' }) + '</div>';
-
-    html += '<div class="dash-section"><h3>Gastado en la casa<span class="tot">' + money(s.expenses.total) + '</span></h3>' + barList(s.expenses.byType) + '</div>';
-
-    html += '<div class="dash-section"><h3>Pagado al arrendador<span class="tot">' + money(s.landlord.total) + '</span></h3>' + barList(s.landlord.byType, { color: 'var(--bad)' }) + '</div>';
-
-    var auto = s.autoTotals || {};
-    if (auto.expenses && Object.keys(auto.expenses).length) {
-      html += '<div class="dash-section"><h3>Totales de tu Excel (tal cual)</h3>' +
-        '<div class="auto-note">Estos valores se leen directo de las celdas de tu planilla, no se recalculan aquí.</div>' +
-        Object.keys(auto.expenses).map(function (k) {
-          return '<div class="auto-row"><span class="n">' + k + '</span><span class="v">' + money(auto.expenses[k]) + '</span></div>';
-        }).join('') + '</div>';
-    }
-    if (auto.tenantsSideSnapshot) {
-      var snap = auto.tenantsSideSnapshot;
-      html += '<div class="dash-section"><h3>Resumen anotado en Tenants (Room 2)</h3>' +
-        '<div class="auto-note">Última fila con datos en las columnas Rent/Bond Held/etc. — ' + snap.tenant + '.</div>' +
-        Object.keys(snap).filter(function (k) { return k !== 'tenant'; }).map(function (k) {
-          return '<div class="auto-row"><span class="n">' + k + '</span><span class="v">' + money(snap[k]) + '</span></div>';
-        }).join('') + '</div>';
-    }
-
     el.innerHTML = html;
   }
+
+  if (sessionStorage.getItem(LOCK_KEY) === '1') { loadTenantsRegistry(); loadAllAndRenderActive(); }
 })();
 </script>
 </body>

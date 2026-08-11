@@ -142,6 +142,40 @@ section('5. To Landlord: completa la fila prellenada de la fecha, no duplica');
 }
 
 // ---------------------------------------------------------------
+section('6. Resumen nuevo: renta/servicios pagados por tipo, bond a devolver, renta esperada, historial completo');
+{
+  const { ss, sandbox } = freshSandbox();
+
+  // paidByType: suma de Rent pagado por TODOS los tenants (Ana 200 + Beto 300 del seed sintético).
+  const res1 = callDoGet(sandbox, { secret: SECRET, summary: '1' });
+  check('paidByType.Rent = 500 (Ana + Beto)', res1.summary.tenants.paidByType['Rent'] === 500, res1.summary.tenants.paidByType);
+  check('paidByTypePerTenant.Ana Test.Rent = 200', res1.summary.tenants.paidByTypePerTenant['Ana Test']['Rent'] === 200);
+
+  // landlord.expected: un solo pago sembrado el 2026-01-01 -> sinceDate debe coincidir.
+  check('landlord.expected.sinceDate = 01/01/2026', res1.summary.landlord.expected.sinceDate === '01/01/2026', res1.summary.landlord.expected);
+  check('landlord.expected.amount es número >= 0', typeof res1.summary.landlord.expected.amount === 'number' && res1.summary.landlord.expected.amount >= 0);
+
+  // bond a devolver: ficha con Bond Monto 500, luego un Refund de 150 -> quedan 350.
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantProfile', name: 'Elena Test', room: 'Pieza 1', bondAmount: 500 });
+  const res2a = callDoGet(sandbox, { secret: SECRET, summary: '1' });
+  check('bond.byTenant.Elena Test = 500 antes de cualquier refund', res2a.summary.bond.byTenant['Elena Test'] === 500, res2a.summary.bond);
+
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantPayment', date: '2026-02-01', amount: 150, tenant: 'Elena Test', type: 'Refund' });
+  const res2b = callDoGet(sandbox, { secret: SECRET, summary: '1' });
+  check('bond.byTenant.Elena Test = 350 después del refund de 150', res2b.summary.bond.byTenant['Elena Test'] === 350, res2b.summary.bond);
+  check('bond.totalHeld incluye los 350 de Elena', res2b.summary.bond.totalHeld >= 350, res2b.summary.bond);
+
+  // full=1 debe traer TODAS las filas de Tenants, no solo las últimas 5.
+  for (let i = 0; i < 6; i++) {
+    callDoPost(sandbox, { secret: SECRET, action: 'addTenantPayment', date: '2026-03-0' + (i + 1), amount: 10 + i, tenant: 'Fill Test', type: 'Rent' });
+  }
+  const shortList = callDoGet(sandbox, { secret: SECRET, recent: '2' });
+  const fullList = callDoGet(sandbox, { secret: SECRET, full: '1' });
+  check('recent=2 trae solo 2 filas de Tenants', shortList.recent['Tenants'].length === 2, shortList.recent['Tenants'].length);
+  check('full=1 trae más filas que recent=2', fullList.recent['Tenants'].length > shortList.recent['Tenants'].length, fullList.recent['Tenants'].length);
+}
+
+// ---------------------------------------------------------------
 console.log('\n' + '='.repeat(50));
 console.log(pass + ' OK, ' + fail + ' FAIL');
 if (fail) process.exit(1);

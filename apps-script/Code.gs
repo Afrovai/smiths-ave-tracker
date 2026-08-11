@@ -173,6 +173,8 @@ function doPost(e) {
 
 /**
  * GET ?secret=...&recent=5   -> últimas filas de cada pestaña.
+ * GET ?secret=...&full=1     -> TODAS las filas de cada pestaña (para el
+ *                               historial completo de cada tab de la app).
  * GET ?secret=...&summary=1  -> totales agregados para el dashboard.
  * GET ?secret=...&tenants=1  -> fichas del registro de arrendatarios.
  */
@@ -190,7 +192,7 @@ function doGet(e) {
       return jsonOut({ ok: true, tenants: getRegistryRows(ss), rooms: ROOMS });
     }
 
-    const n = Number(e.parameter.recent || 5);
+    const n = e.parameter.full ? Number.MAX_SAFE_INTEGER : Number(e.parameter.recent || 5);
     const out = {};
     ['Expenses', 'Tenants', 'To Landlord'].forEach(function (name) {
       out[name] = lastRows(ss, name, n);
@@ -309,7 +311,15 @@ function computeSummary(ss) {
   const paidByTenant = {};
   const pendingByTenant = {};
   const byTypePerTenant = {};
+  // Igual que byTypePerTenant pero SOLO lo efectivamente pagado (no lo
+  // pendiente) — es lo que se muestra en el resumen por arrendatario.
+  const paidByTypePerTenant = {};
+  // Lo mismo pero sumado entre todos los arrendatarios (ej: renta total
+  // pagada por los tenants de la casa, para la pestaña Landlord).
+  const paidByType = {};
   const utilityChargedToTenants = { Internet: 0, Water: 0, Electricity: 0, Gas: 0 };
+  // Solo movimientos YA PAGADOS (no pendientes) — "cuánto me ha dado" cada
+  // pieza, no cuánto le falta por pagar.
   const byRoom = {};
 
   tenantRows.forEach(function (r) {
@@ -319,23 +329,29 @@ function computeSummary(ss) {
     const isPending = r['Payment Method'] === 'Pending';
 
     if (tenant) {
+      byTypePerTenant[tenant] = byTypePerTenant[tenant] || {};
+      byTypePerTenant[tenant][type] = round2((byTypePerTenant[tenant][type] || 0) + amt);
+
       if (isPending) {
         pendingByTenant[tenant] = round2((pendingByTenant[tenant] || 0) + amt);
       } else {
         paidByTenant[tenant] = round2((paidByTenant[tenant] || 0) + amt);
+        paidByTypePerTenant[tenant] = paidByTypePerTenant[tenant] || {};
+        paidByTypePerTenant[tenant][type] = round2((paidByTypePerTenant[tenant][type] || 0) + amt);
+        paidByType[type] = round2((paidByType[type] || 0) + amt);
       }
-      byTypePerTenant[tenant] = byTypePerTenant[tenant] || {};
-      byTypePerTenant[tenant][type] = round2((byTypePerTenant[tenant][type] || 0) + amt);
     }
 
     if (utilityChargedToTenants.hasOwnProperty(type)) {
       utilityChargedToTenants[type] = round2(utilityChargedToTenants[type] + amt);
     }
 
-    const roomLabel = NUMBER_TO_ROOM_LABEL[r['Room']] || (r['Room'] ? ('Pieza ' + r['Room']) : 'Sin pieza asignada');
-    byRoom[roomLabel] = byRoom[roomLabel] || { total: 0, byType: {} };
-    byRoom[roomLabel].total = round2(byRoom[roomLabel].total + amt);
-    byRoom[roomLabel].byType[type] = round2((byRoom[roomLabel].byType[type] || 0) + amt);
+    if (!isPending) {
+      const roomLabel = NUMBER_TO_ROOM_LABEL[r['Room']] || (r['Room'] ? ('Pieza ' + r['Room']) : 'Sin pieza asignada');
+      byRoom[roomLabel] = byRoom[roomLabel] || { total: 0, byType: {} };
+      byRoom[roomLabel].total = round2(byRoom[roomLabel].total + amt);
+      byRoom[roomLabel].byType[type] = round2((byRoom[roomLabel].byType[type] || 0) + amt);
+    }
   });
 
   const totalPaidByTenants = round2(sumValues(paidByTenant));
@@ -349,19 +365,24 @@ function computeSummary(ss) {
   const tenantsSheet = ss.getSheetByName('Tenants');
   const tenantsSnapshot = tenantsSheet ? readTenantsSideSnapshot(tenantsSheet) : null;
 
+  const registryRows = getRegistryRows(ss);
+
   return {
-    landlord: { total: round2(landlordTotal), byType: landlordByType },
+    landlord: { total: round2(landlordTotal), byType: landlordByType, expected: computeLandlordExpected(landlordRows) },
     expenses: { total: round2(expenseTotal), byType: expenseByType },
     tenants: {
       paidByTenant: paidByTenant,
       pendingByTenant: pendingByTenant,
       byTypePerTenant: byTypePerTenant,
+      paidByTypePerTenant: paidByTypePerTenant,
+      paidByType: paidByType,
       totalPaid: totalPaidByTenants,
       totalPending: totalPendingFromTenants
     },
+    bond: computeBond(tenantRows, registryRows),
     utilityChargedToTenants: utilityChargedToTenants,
     byRoom: byRoom,
-    registry: getRegistryRows(ss),
+    registry: registryRows,
     // Tal cual están en tu Excel — no recalculados por esta app.
     autoTotals: {
       expenses: expensesAutoTotals,
@@ -373,6 +394,44 @@ function computeSummary(ss) {
       gastadoEnCasa: round2(expenseTotal),
       margenNeto: round2(totalPaidByTenants - landlordTotal - expenseTotal)
     }
+  };
+}
+
+// Bond que aún se le debe devolver a cada arrendatario: lo que se anotó al
+// crear su ficha ("Bond Monto") menos cualquier pago tipo "Refund" que se
+// le haya registrado desde entonces en Tenants.
+function computeBond(tenantRows, registryRows) {
+  const refundsByTenant = {};
+  tenantRows.forEach(function (r) {
+    if (r['Type'] === 'Refund' && r['Tenant']) {
+      refundsByTenant[r['Tenant']] = round2((refundsByTenant[r['Tenant']] || 0) + (Number(r['Amount']) || 0));
+    }
+  });
+  const byTenant = {};
+  let totalHeld = 0;
+  registryRows.forEach(function (t) {
+    const held = Number(t['Bond Monto']) || 0;
+    const refunded = refundsByTenant[t['Nombre']] || 0;
+    const remaining = round2(held - refunded);
+    byTenant[t['Nombre']] = remaining;
+    totalHeld = round2(totalHeld + remaining);
+  });
+  return { totalHeld: totalHeld, byTenant: byTenant };
+}
+
+// Cuánto DEBERÍA llevar pagado Nicolás al arrendador según la tarifa fija
+// ($1.600 cada 2 semanas), calculado desde la fecha del primer pago
+// registrado en "To Landlord" hasta hoy — para comparar contra lo real.
+function computeLandlordExpected(landlordRows) {
+  const dates = landlordRows.map(function (r) { return parseSheetDate(r['Date']); }).filter(function (d) { return d; });
+  if (!dates.length) return null;
+  const minDate = new Date(Math.min.apply(null, dates.map(function (d) { return d.getTime(); })));
+  const today = new Date();
+  const days = Math.max(0, Math.round((today.getTime() - minDate.getTime()) / 86400000));
+  const fortnights = days / 14;
+  return {
+    amount: round2(fortnights * HOUSE_RENT_PER_WEEK * 2),
+    sinceDate: Utilities.formatDate(minDate, Session.getScriptTimeZone(), 'dd/MM/yyyy')
   };
 }
 
@@ -568,6 +627,22 @@ function normalizeDateForCompare(value) {
   const mm = m[2].padStart(2, '0');
   const yyyy = m[3].length === 2 ? '20' + m[3] : m[3];
   return dd + '/' + mm + '/' + yyyy;
+}
+
+// Convierte un valor de fecha de la planilla (Date real, o texto
+// dd/mm/yy[yy]) a un objeto Date de JS — para poder comparar/restar fechas.
+// A diferencia de normalizeDateForCompare (que devuelve texto canónico para
+// IGUALAR fechas), esta devuelve un Date real para poder calcular DÍAS
+// TRANSCURRIDOS (usado en computeLandlordExpected).
+function parseSheetDate(value) {
+  if (value instanceof Date) return value;
+  const s = String(value || '').trim();
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (!m) return null;
+  const dd = Number(m[1]);
+  const mm = Number(m[2]) - 1;
+  const yyyy = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  return new Date(yyyy, mm, dd);
 }
 
 function lastRows(ss, sheetName, n) {
