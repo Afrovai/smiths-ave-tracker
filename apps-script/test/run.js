@@ -365,6 +365,30 @@ section('14. Nota manual "Rent Paid from Nico" en To Landlord — se lee tal cua
 }
 
 // ---------------------------------------------------------------
+section('15. Rent Paid from Nico calculado EN VIVO (confirmado por Nicolás: = renta pagada al arrendador − renta pagada por tenants)');
+{
+  // Sandbox realmente vacío (no freshSandbox()) — el seed sintético trae de
+  // fábrica $500 de Rent tanto en Landlord como en Tenants, lo que
+  // distorsionaría los valores absolutos que se están verificando acá.
+  const ss = new MockSpreadsheet();
+  ss._seed('Tenants', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail', 'Room', 'Tenant']]);
+  ss._seed('To Landlord', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail']]);
+  ss._seed('Expenses', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail']]);
+  const sandbox = loadCode(buildSandbox(ss));
+  // Reproduce los números reales verificados en producción el 2026-08-11:
+  // landlord.byType.Rent = 19200, tenants.paidByType.Rent = 15840 -> 3360.
+  for (let i = 0; i < 12; i++) {
+    callDoPost(sandbox, { secret: SECRET, action: 'addLandlordPayment', date: '2026-0' + (1 + (i % 9)) + '-0' + (1 + (i % 9)), amount: 1600, type: 'Rent' });
+  }
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantPayment', date: '2026-05-01', amount: 15840, tenant: 'Real Test', type: 'Rent' });
+
+  const res = callDoGet(sandbox, { secret: SECRET, summary: '1' });
+  check('landlord.byType.Rent = 19200 (12 x 1600)', res.summary.landlord.byType['Rent'] === 19200, res.summary.landlord.byType);
+  check('tenants.paidByType.Rent = 15840', res.summary.tenants.paidByType['Rent'] === 15840, res.summary.tenants.paidByType);
+  check('landlord.rentPaidFromNico = 3360 (19200 - 15840)', res.summary.landlord.rentPaidFromNico === 3360, res.summary.landlord.rentPaidFromNico);
+}
+
+// ---------------------------------------------------------------
 console.log('\n' + '='.repeat(50));
 console.log(pass + ' OK, ' + fail + ' FAIL');
 if (fail) process.exit(1);

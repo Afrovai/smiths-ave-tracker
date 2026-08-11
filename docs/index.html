@@ -1268,11 +1268,15 @@
         '<div class="auto-row total"><span class="n">Diferencia (real − esperado)</span><span class="v" style="color:' + (diff >= 0 ? 'var(--good)' : 'var(--bad)') + '">' + money(diff) + '</span></div>';
     }
 
-    var nicoNote = s.landlord.rentPaidFromNicoNote;
-    if (nicoNote) {
+    if (s.landlord.rentPaidFromNico != null) {
+      var rpfn = s.landlord.rentPaidFromNico;
+      var nicoNote = s.landlord.rentPaidFromNicoNote;
       html += '<div class="section-title">Rent Paid from Nico</div>' +
-        '<div class="auto-note">Anotado a mano por ti en "To Landlord"' + (nicoNote.date ? ' el ' + nicoNote.date : '') + ' — no se recalcula, se muestra tal cual quedó anotado.</div>' +
-        '<div class="auto-row"><span class="n">Última anotación</span><span class="v">' + money(nicoNote.value) + '</span></div>';
+        '<div class="auto-note">Renta pagada por Nico menos renta pagada por los tenants — se recalcula sola con cada movimiento nuevo.</div>' +
+        '<div class="auto-row"><span class="n">Rent Paid from Nico</span><span class="v">' + money(rpfn) + '</span></div>';
+      if (nicoNote && Math.abs(nicoNote.value - rpfn) > 0.01) {
+        html += '<div class="auto-note" style="color:var(--pending)">Tu última anotación a mano (' + (nicoNote.date || '—') + ') decía ' + money(nicoNote.value) + ' — quedó desactualizada, ya no hace falta que la sigas anotando.</div>';
+      }
     }
     el.innerHTML = html;
   }
@@ -1378,8 +1382,8 @@
     var real = (s.landlord.byType && s.landlord.byType['Rent']) || 0;
     var expected = s.landlord.expected;
     if (!expected) { el.innerHTML = '<div class="chart-empty">Sin pagos de renta registrados todavía.</div>'; return; }
-    var nicoNote = s.landlord.rentPaidFromNicoNote;
-    var max = Math.max(real, expected.amount, nicoNote ? nicoNote.value : 0) || 1;
+    var rentPaidFromNico = s.landlord.rentPaidFromNico;
+    var max = Math.max(real, expected.amount, rentPaidFromNico || 0) || 1;
     var pctReal = Math.max(3, Math.round(real / max * 100));
     var pctExp = Math.max(3, Math.round(expected.amount / max * 100));
     el.innerHTML =
@@ -1387,11 +1391,11 @@
       '<div class="hbar-track"><div class="hbar-fill" style="width:' + pctReal + '%"></div></div></div>' +
       '<div class="hbar-row"><div class="top"><span class="name">Esperado (tarifa)</span><span class="val">' + money(expected.amount) + '</span></div>' +
       '<div class="hbar-track"><div class="hbar-fill muted" style="width:' + pctExp + '%"></div></div></div>';
-    if (nicoNote) {
-      var pctNote = Math.max(3, Math.round(nicoNote.value / max * 100));
+    if (rentPaidFromNico != null) {
+      var pctNico = Math.max(3, Math.round(Math.abs(rentPaidFromNico) / max * 100));
       el.innerHTML +=
-        '<div class="hbar-row"><div class="top"><span class="name">Tu nota "Rent Paid from Nico"' + (nicoNote.date ? ' (' + nicoNote.date + ')' : '') + '</span><span class="val">' + money(nicoNote.value) + '</span></div>' +
-        '<div class="hbar-track"><div class="hbar-fill note" style="width:' + pctNote + '%"></div></div></div>';
+        '<div class="hbar-row"><div class="top"><span class="name">Rent Paid from Nico (pagado − cobrado a tenants)</span><span class="val">' + money(rentPaidFromNico) + '</span></div>' +
+        '<div class="hbar-track"><div class="hbar-fill note" style="width:' + pctNico + '%"></div></div></div>';
     }
   }
 

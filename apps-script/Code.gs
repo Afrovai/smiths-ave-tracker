@@ -423,11 +423,19 @@ function computeSummary(ss) {
   const landlordSheet = ss.getSheetByName('To Landlord');
   const rentPaidFromNicoNote = landlordSheet ? readLandlordManualNote(landlordSheet, 'Rent Paid from Nico') : null;
 
+  // "Rent Paid from Nico" = renta que Nico le paga al arrendador MENOS la
+  // renta que los arrendatarios ya le pagaron a él — confirmado por
+  // Nicolás: es literalmente la fórmula J2-J3 de su hoja "To Landlord".
+  // Antes solo se leía como nota manual (se desactualizaba); ahora se
+  // calcula en vivo con los mismos totales que ya arma este resumen.
+  const rentPaidFromNico = round2((landlordByType['Rent'] || 0) - (paidByType['Rent'] || 0));
+
   const registryRows = getRegistryRows(ss);
 
   return {
     landlord: {
       total: round2(landlordTotal), byType: landlordByType, expected: computeLandlordExpected(landlordRows),
+      rentPaidFromNico: rentPaidFromNico,
       rentPaidFromNicoNote: rentPaidFromNicoNote
     },
     expenses: { total: round2(expenseTotal), byType: expenseByType },
