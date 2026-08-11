@@ -420,10 +420,16 @@ function computeSummary(ss) {
   const tenantsSheet = ss.getSheetByName('Tenants');
   const tenantsSnapshot = tenantsSheet ? readTenantsSideSnapshot(tenantsSheet) : null;
 
+  const landlordSheet = ss.getSheetByName('To Landlord');
+  const rentPaidFromNicoNote = landlordSheet ? readLandlordManualNote(landlordSheet, 'Rent Paid from Nico') : null;
+
   const registryRows = getRegistryRows(ss);
 
   return {
-    landlord: { total: round2(landlordTotal), byType: landlordByType, expected: computeLandlordExpected(landlordRows) },
+    landlord: {
+      total: round2(landlordTotal), byType: landlordByType, expected: computeLandlordExpected(landlordRows),
+      rentPaidFromNicoNote: rentPaidFromNicoNote
+    },
     expenses: { total: round2(expenseTotal), byType: expenseByType },
     tenants: {
       paidByTenant: paidByTenant,
@@ -551,6 +557,42 @@ function readTenantsSideSnapshot(sheet) {
     }
   }
   return null;
+}
+
+// "To Landlord" tiene un par de columnas extra donde Nicolás anota a mano,
+// de vez en cuando, algunas notas sueltas ("Rent Paid from Nico", "Room1",
+// "Room2", etc. — cada una en SU PROPIA fila, no todas juntas). No sabemos
+// en qué columna exacta cae el valor respecto a la etiqueta, así que se
+// escanea la fila completa y se toma el número que esté inmediatamente al
+// lado (izquierda o derecha) de la etiqueta buscada. Se lee TAL CUAL,
+// nunca se recalcula — es una nota manual de Nicolás, no algo que la app
+// sepa reproducir.
+function readLandlordManualNote(sheet, label) {
+  const headerRow = findHeaderRow(sheet);
+  const lastRow = sheet.getLastRow();
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  if (lastRow <= headerRow) return null;
+  const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
+  const dateIdx = headers.indexOf('Date');
+  const data = sheet.getRange(headerRow + 1, 1, lastRow - headerRow, lastCol).getValues();
+
+  for (let r = 0; r < data.length; r++) {
+    const row = data[r];
+    for (let c = 0; c < row.length; c++) {
+      if (String(row[c]).trim() !== label) continue;
+      const left = c > 0 ? row[c - 1] : null;
+      const right = c < row.length - 1 ? row[c + 1] : null;
+      const val = typeof left === 'number' ? left : (typeof right === 'number' ? right : null);
+      if (val == null) continue;
+      return { value: round2(val), date: dateIdx !== -1 ? formatDateValue(row[dateIdx]) : null };
+    }
+  }
+  return null;
+}
+
+function formatDateValue(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  return v || null;
 }
 
 function sumField(rows, field) {

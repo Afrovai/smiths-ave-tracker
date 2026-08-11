@@ -342,6 +342,29 @@ section('13. editRecord/deleteRecord rechazan la operación si la fila cambió d
 }
 
 // ---------------------------------------------------------------
+section('14. Nota manual "Rent Paid from Nico" en To Landlord — se lee tal cual, sin importar de qué lado cae el valor');
+{
+  // Reproduce el layout real encontrado en la planilla de Nicolás: columnas
+  // extra en "To Landlord" donde anota notas sueltas, una por fila, con el
+  // valor a veces a la izquierda y a veces a la derecha de la etiqueta.
+  const ss = new MockSpreadsheet();
+  ss._seed('Tenants', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail', 'Room', 'Tenant']]);
+  ss._seed('To Landlord', [
+    [],
+    ['Date', 'Day', 'Amount', 'Payment Method', 'Type', 'Detail', 'Total Rent Paid'],
+    [new Date(2026, 2, 17), 'Tuesday', 1600, 'Transfer', 'Rent', '', 'Room1', 6460], // valor a la DERECHA de la etiqueta
+    [new Date(2026, 3, 14), 'Tuesday', 1600, 'Transfer', 'Rent', '', 3360, 'Rent Paid from Nico'] // valor a la IZQUIERDA de la etiqueta
+  ]);
+  ss._seed('Expenses', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail']]);
+  const sandbox = loadCode(buildSandbox(ss));
+
+  const res = callDoGet(sandbox, { secret: SECRET, summary: '1' });
+  const note = res.summary.landlord.rentPaidFromNicoNote;
+  check('rentPaidFromNicoNote no es null', note != null, note);
+  check('valor = 3360 (lo encontró aunque estaba a la izquierda)', note && note.value === 3360, note);
+}
+
+// ---------------------------------------------------------------
 console.log('\n' + '='.repeat(50));
 console.log(pass + ' OK, ' + fail + ' FAIL');
 if (fail) process.exit(1);

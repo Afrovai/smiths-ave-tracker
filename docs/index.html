@@ -135,6 +135,39 @@
 
   .dash-empty, .recent-empty { font-size: 13px; color: var(--muted); padding: 6px 0; }
 
+  /* ---------- dashboard: charts ---------- */
+  .chart-empty { font-size: 13px; color: var(--muted); padding: 6px 0 2px; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .kpi-tile {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 10px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .kpi-tile .l { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+  .kpi-tile .v { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .kpi-tile .v.good { color: var(--good); }
+  .kpi-tile .v.bad { color: var(--bad); }
+
+  /* Barra horizontal: relleno crece desde la izquierda (baseline), extremo
+     redondeado solo del lado del dato (derecha), cuadrado en la baseline. */
+  .hbar-row { margin-bottom: 12px; }
+  .hbar-row:last-child { margin-bottom: 0; }
+  .hbar-row .top { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; margin-bottom: 5px; gap: 10px; }
+  .hbar-row .top .name { color: var(--ink-2); }
+  .hbar-row .top .val { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+  .hbar-track { height: 10px; background: var(--line); border-radius: 0 4px 4px 0; overflow: hidden; }
+  .hbar-fill { height: 100%; background: var(--ink); border-radius: 0 4px 4px 0; }
+  .hbar-fill.muted { background: var(--muted); }
+  .hbar-fill.note { background: var(--pending); }
+
+  /* Columnas mensuales: alturas de barra en píxeles calculadas en JS (no %),
+     alineadas por abajo — evita ambigüedad de porcentajes anidados en flex. */
+  .month-chart { display: flex; align-items: flex-end; gap: 8px; }
+  .month-col { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  .month-col .val { font-size: 10px; color: var(--ink-2); margin-bottom: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .month-col .bar { width: 100%; max-width: 28px; background: var(--ink); border-radius: 4px 4px 0 0; }
+  .month-col .lbl { font-size: 10.5px; color: var(--muted); margin-top: 6px; text-transform: uppercase; }
+
   .tenant-card {
     border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--bg);
   }
@@ -266,6 +299,7 @@
     <div class="tab active" data-tab="tenant">Tenant</div>
     <div class="tab" data-tab="landlord">Landlord</div>
     <div class="tab" data-tab="expense">Expenses</div>
+    <div class="tab" data-tab="dashboard">Dashboard</div>
   </div>
 
   <!-- TENANT -->
@@ -443,6 +477,26 @@
     <div class="section-title">Historial</div>
     <div id="expenseHistory"></div>
   </form>
+
+  <!-- DASHBOARD -->
+  <div class="card" id="form-dashboard">
+    <div class="kpi-row" id="kpiRow"><div class="chart-empty">Configura la conexión (⚙) para ver esto.</div></div>
+
+    <div class="section-title">Gastos por categoría</div>
+    <div id="chartExpenseCategory"></div>
+
+    <div class="section-title">Pagado por arrendatario</div>
+    <div id="chartPaidByTenant"></div>
+
+    <div class="section-title">Renta al arrendador: pagado por Nico vs. esperado</div>
+    <div id="chartRentComparison"></div>
+
+    <div class="section-title">Bond en mano por arrendatario</div>
+    <div id="chartBond"></div>
+
+    <div class="section-title">Gastos por mes</div>
+    <div id="chartMonthlyExpenses"></div>
+  </div>
 
   <datalist id="tenantList">
     <option value="Juan Plata">
@@ -1093,6 +1147,7 @@
     if (activeTab === 'tenant') { renderTenantSummary(); renderTenantHistory(); }
     else if (activeTab === 'landlord') { renderLandlordSummary(); renderLandlordHistory(); }
     else if (activeTab === 'expense') { renderExpenseSummary(); renderExpenseHistory(); }
+    else if (activeTab === 'dashboard') { renderDashboard(); }
   }
 
   function renderTenantSummary() {
@@ -1194,7 +1249,7 @@
     var room1 = (s.byRoom && s.byRoom['Pieza 1'] && s.byRoom['Pieza 1'].total) || 0;
     var room2 = (s.byRoom && s.byRoom['Pieza 2'] && s.byRoom['Pieza 2'].total) || 0;
     var rows = [
-      ['Renta pagada al arrendador', rentToLandlord],
+      ['Renta pagada por Nico (al arrendador)', rentToLandlord],
       ['Renta pagada por los tenants', rentFromTenants],
       ['Bond total en mano', bondTotal],
       ['Pieza 1 — total recibido', room1],
@@ -1211,6 +1266,13 @@
         '<div class="auto-note">Calculada desde el primer pago de renta (' + expected.sinceDate + ') hasta hoy — no cuenta el bond.</div>' +
         '<div class="auto-row"><span class="n">Debería llevar pagado</span><span class="v">' + money(expected.amount) + '</span></div>' +
         '<div class="auto-row total"><span class="n">Diferencia (real − esperado)</span><span class="v" style="color:' + (diff >= 0 ? 'var(--good)' : 'var(--bad)') + '">' + money(diff) + '</span></div>';
+    }
+
+    var nicoNote = s.landlord.rentPaidFromNicoNote;
+    if (nicoNote) {
+      html += '<div class="section-title">Rent Paid from Nico</div>' +
+        '<div class="auto-note">Anotado a mano por ti en "To Landlord"' + (nicoNote.date ? ' el ' + nicoNote.date : '') + ' — no se recalcula, se muestra tal cual quedó anotado.</div>' +
+        '<div class="auto-row"><span class="n">Última anotación</span><span class="v">' + money(nicoNote.value) + '</span></div>';
     }
     el.innerHTML = html;
   }
@@ -1238,6 +1300,133 @@
         openEditModal('To Landlord', historyLandlord[Number(btn.dataset.idx)]);
       });
     });
+  }
+
+  // ---- dashboard: charts ----
+  function renderDashboard() {
+    renderKpiRow();
+    renderExpenseByCategoryChart();
+    renderPaidByTenantChart();
+    renderRentComparisonChart();
+    renderBondChart();
+    renderMonthlyExpensesChart();
+  }
+
+  function renderKpiRow() {
+    var el = document.getElementById('kpiRow');
+    if (!cfg.url) { el.innerHTML = '<div class="chart-empty">Configura la conexión (⚙) para ver esto.</div>'; return; }
+    if (!latestSummary) { el.innerHTML = '<div class="chart-empty">Cargando…</div>'; return; }
+    var bp = latestSummary.bigPicture;
+    el.innerHTML =
+      '<div class="kpi-tile"><span class="l">Cobrado a inquilinos</span><span class="v">' + money(bp.cobradoATenants) + '</span></div>' +
+      '<div class="kpi-tile"><span class="l">Pagado + gastado</span><span class="v">' + money(bp.pagadoALandlord + bp.gastadoEnCasa) + '</span></div>' +
+      '<div class="kpi-tile"><span class="l">Margen neto</span><span class="v ' + (bp.margenNeto >= 0 ? 'good' : 'bad') + '">' + money(bp.margenNeto) + '</span></div>';
+  }
+
+  // Lista de barras horizontales de una sola serie (todas el mismo hue —
+  // son categorías nominales comparadas por magnitud, no series distintas
+  // que necesiten identidad propia, así que no llevan leyenda).
+  function hbarList(entries) {
+    if (!entries.length) return '<div class="chart-empty">Sin datos todavía.</div>';
+    var max = Math.max.apply(null, entries.map(function (e) { return Math.abs(e[1]); })) || 1;
+    return entries.map(function (e) {
+      var pct = Math.max(3, Math.round(Math.abs(e[1]) / max * 100));
+      return '<div class="hbar-row">' +
+        '<div class="top"><span class="name">' + e[0] + '</span><span class="val">' + money(e[1]) + '</span></div>' +
+        '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%"></div></div>' +
+        '</div>';
+    }).join('');
+  }
+
+  function sortedEntries(obj) {
+    return Object.keys(obj || {})
+      .map(function (k) { return [k, obj[k]]; })
+      .filter(function (e) { return e[1] > 0; })
+      .sort(function (a, b) { return b[1] - a[1]; });
+  }
+
+  function renderExpenseByCategoryChart() {
+    var el = document.getElementById('chartExpenseCategory');
+    if (!cfg.url) { el.innerHTML = ''; return; }
+    if (!latestSummary) { el.innerHTML = '<div class="chart-empty">Cargando…</div>'; return; }
+    el.innerHTML = hbarList(sortedEntries(latestSummary.expenses.byType));
+  }
+
+  function renderPaidByTenantChart() {
+    var el = document.getElementById('chartPaidByTenant');
+    if (!cfg.url) { el.innerHTML = ''; return; }
+    if (!latestSummary) { el.innerHTML = '<div class="chart-empty">Cargando…</div>'; return; }
+    el.innerHTML = hbarList(sortedEntries(latestSummary.tenants.paidByTenant));
+  }
+
+  function renderBondChart() {
+    var el = document.getElementById('chartBond');
+    if (!cfg.url) { el.innerHTML = ''; return; }
+    if (!latestSummary) { el.innerHTML = '<div class="chart-empty">Cargando…</div>'; return; }
+    el.innerHTML = hbarList(sortedEntries((latestSummary.bond || {}).byTenant));
+  }
+
+  // Comparación de 2 barras (no es una serie categórica de 8 — son
+  // exactamente 2 valores con roles distintos): "Real" en el hue sólido de
+  // datos, "Esperado" en el hue muted, con su propia etiqueta directa cada
+  // una — no necesitan leyenda aparte.
+  function renderRentComparisonChart() {
+    var el = document.getElementById('chartRentComparison');
+    if (!cfg.url) { el.innerHTML = ''; return; }
+    if (!latestSummary) { el.innerHTML = '<div class="chart-empty">Cargando…</div>'; return; }
+    var s = latestSummary;
+    var real = (s.landlord.byType && s.landlord.byType['Rent']) || 0;
+    var expected = s.landlord.expected;
+    if (!expected) { el.innerHTML = '<div class="chart-empty">Sin pagos de renta registrados todavía.</div>'; return; }
+    var nicoNote = s.landlord.rentPaidFromNicoNote;
+    var max = Math.max(real, expected.amount, nicoNote ? nicoNote.value : 0) || 1;
+    var pctReal = Math.max(3, Math.round(real / max * 100));
+    var pctExp = Math.max(3, Math.round(expected.amount / max * 100));
+    el.innerHTML =
+      '<div class="hbar-row"><div class="top"><span class="name">Pagado por Nico</span><span class="val">' + money(real) + '</span></div>' +
+      '<div class="hbar-track"><div class="hbar-fill" style="width:' + pctReal + '%"></div></div></div>' +
+      '<div class="hbar-row"><div class="top"><span class="name">Esperado (tarifa)</span><span class="val">' + money(expected.amount) + '</span></div>' +
+      '<div class="hbar-track"><div class="hbar-fill muted" style="width:' + pctExp + '%"></div></div></div>';
+    if (nicoNote) {
+      var pctNote = Math.max(3, Math.round(nicoNote.value / max * 100));
+      el.innerHTML +=
+        '<div class="hbar-row"><div class="top"><span class="name">Tu nota "Rent Paid from Nico"' + (nicoNote.date ? ' (' + nicoNote.date + ')' : '') + '</span><span class="val">' + money(nicoNote.value) + '</span></div>' +
+        '<div class="hbar-track"><div class="hbar-fill note" style="width:' + pctNote + '%"></div></div></div>';
+    }
+  }
+
+  var MONTH_ABBR = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  var MAX_MONTH_BAR_PX = 70;
+
+  function renderMonthlyExpensesChart() {
+    var el = document.getElementById('chartMonthlyExpenses');
+    if (!cfg.url) { el.innerHTML = ''; return; }
+    if (!historyExpenses.length) { el.innerHTML = '<div class="chart-empty">Sin gastos todavía.</div>'; return; }
+    var byMonth = {};
+    historyExpenses.forEach(function (r) {
+      // Año de 2 o 4 dígitos según cómo haya quedado la celda en Sheets —
+      // mismo criterio tolerante que usa el backend (parseSheetDate).
+      var m = String(r['Date'] || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+      if (!m) return;
+      var mm = m[2].length === 1 ? '0' + m[2] : m[2];
+      var yyyy = m[3].length === 2 ? '20' + m[3] : m[3];
+      var key = yyyy + '-' + mm; // yyyy-mm, para que ordene bien como texto
+      byMonth[key] = round2((byMonth[key] || 0) + (Number(r['Amount']) || 0));
+    });
+    var keys = Object.keys(byMonth).sort();
+    var last = keys.slice(-6); // últimos 6 meses con gastos
+    if (!last.length) { el.innerHTML = '<div class="chart-empty">Sin gastos todavía.</div>'; return; }
+    var max = Math.max.apply(null, last.map(function (k) { return byMonth[k]; })) || 1;
+    el.innerHTML = '<div class="month-chart">' + last.map(function (k) {
+      var mIdx = Number(k.split('-')[1]) - 1;
+      var val = byMonth[k];
+      var barPx = Math.max(2, Math.round(val / max * MAX_MONTH_BAR_PX));
+      return '<div class="month-col">' +
+        '<span class="val">' + money(val) + '</span>' +
+        '<div class="bar" style="height:' + barPx + 'px"></div>' +
+        '<span class="lbl">' + MONTH_ABBR[mIdx] + '</span>' +
+        '</div>';
+    }).join('') + '</div>';
   }
 
   // ---- editar / eliminar un registro existente ----
