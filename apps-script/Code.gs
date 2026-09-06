@@ -478,12 +478,15 @@ function computeSummary(ss) {
 }
 
 // Bond que aún se le debe devolver a cada arrendatario: lo que se anotó al
-// crear su ficha ("Bond Monto") menos cualquier pago tipo "Refund" que se
-// le haya registrado desde entonces en Tenants.
+// crear su ficha ("Bond Monto") menos cualquier pago tipo "Refund" y menos
+// cualquier pago (de cualquier tipo, ej: Rent) hecho con Método de pago
+// "Bond" — en ambos casos se está devolviendo/gastando el bond que se tenía
+// en mano, así que reduce lo que aún se le debe.
 function computeBond(tenantRows, registryRows) {
   const refundsByTenant = {};
   tenantRows.forEach(function (r) {
-    if (r['Type'] === 'Refund' && r['Tenant']) {
+    const usedBond = r['Type'] === 'Refund' || r['Payment Method'] === 'Bond';
+    if (usedBond && r['Tenant']) {
       refundsByTenant[r['Tenant']] = round2((refundsByTenant[r['Tenant']] || 0) + (Number(r['Amount']) || 0));
     }
   });

@@ -165,6 +165,13 @@ section('6. Resumen nuevo: renta/servicios pagados por tipo, bond a devolver, re
   check('bond.byTenant.Elena Test = 350 después del refund de 150', res2b.summary.bond.byTenant['Elena Test'] === 350, res2b.summary.bond);
   check('bond.totalHeld incluye los 350 de Elena', res2b.summary.bond.totalHeld >= 350, res2b.summary.bond);
 
+  // Pagar renta con Método de pago "Bond" (usar el bond en mano en vez de
+  // plata nueva) también debe descontar del bond a devolver, igual que un
+  // Refund -> quedan 350 - 200 = 150.
+  callDoPost(sandbox, { secret: SECRET, action: 'addTenantPayment', date: '2026-02-08', amount: 200, tenant: 'Elena Test', type: 'Rent', paymentMethod: 'Bond' });
+  const res2c = callDoGet(sandbox, { secret: SECRET, summary: '1' });
+  check('bond.byTenant.Elena Test = 150 después de pagar renta con el bond', res2c.summary.bond.byTenant['Elena Test'] === 150, res2c.summary.bond);
+
   // full=1 debe traer TODAS las filas de Tenants, no solo las últimas 5.
   for (let i = 0; i < 6; i++) {
     callDoPost(sandbox, { secret: SECRET, action: 'addTenantPayment', date: '2026-03-0' + (i + 1), amount: 10 + i, tenant: 'Fill Test', type: 'Rent' });
