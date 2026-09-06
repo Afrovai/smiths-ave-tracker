@@ -230,6 +230,24 @@ section('8. Renta esperada ancla en el primer pago tipo Rent, no en un Bond ante
 }
 
 // ---------------------------------------------------------------
+section('8b. Renta esperada ancla en el INICIO DEL PERÍODO (Detail), no en la fecha de un pago adelantado');
+{
+  // Caso real de Nicolás: Bond pagado 28/01, primer pago de Renta hecho
+  // adelantado el 24/02 pero para el período que arranca el 03/03 (recién
+  // ahí empezó a usarse la casa) -> sinceDate debe ser 03/03/2026, no 24/02.
+  const ss = new MockSpreadsheet();
+  ss._seed('Tenants', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail', 'Room', 'Tenant']]);
+  ss._seed('To Landlord', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail']]);
+  ss._seed('Expenses', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail']]);
+  const sandbox = loadCode(buildSandbox(ss));
+  callDoPost(sandbox, { secret: SECRET, action: 'addLandlordPayment', date: '2026-01-28', amount: 3200, type: 'Bond' });
+  callDoPost(sandbox, { secret: SECRET, action: 'addLandlordPayment', date: '2026-02-24', amount: 1600, type: 'Rent', detail: '03/03/26 - 17/03/26' });
+  callDoPost(sandbox, { secret: SECRET, action: 'addLandlordPayment', date: '2026-03-17', amount: 1600, type: 'Rent', detail: '17/03/2026 - 31/03/2026' });
+  const res = callDoGet(sandbox, { secret: SECRET, summary: '1' });
+  check('landlord.expected.sinceDate = 03/03/2026 (fecha real de inicio del período, no el 24/02 del pago adelantado)', res.summary.landlord.expected.sinceDate === '03/03/2026', res.summary.landlord.expected);
+}
+
+// ---------------------------------------------------------------
 section('9. rowToObject normaliza fechas tipo Date real a texto dd/MM/yyyy (evita timestamps con hora)');
 {
   const { ss, sandbox } = freshSandbox();

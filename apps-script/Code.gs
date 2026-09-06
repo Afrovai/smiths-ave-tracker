@@ -507,9 +507,18 @@ function computeBond(tenantRows, registryRows) {
 // RENTA (Type = "Rent") hasta hoy — no desde el primer pago de cualquier
 // tipo, porque el primer pago real fue el bond (que no es parte de la
 // tarifa recurrente) y eso adelantaba la fecha de inicio incorrectamente.
+//
+// Para cada pago de renta se usa la fecha de INICIO DEL PERÍODO que cubre
+// (la primera fecha del "Detail", ej: "03/03/26 - 17/03/26") en vez de la
+// fecha en que se hizo el pago, cuando se puede leer — así un pago
+// adelantado (ej: pagado el 24/02 para el período que arranca el 03/03,
+// que fue el primer pago real de renta de la casa) no ancla el cálculo
+// antes de cuándo realmente empezó a correr la renta.
 function computeLandlordExpected(landlordRows) {
   const rentRows = landlordRows.filter(function (r) { return r['Type'] === 'Rent'; });
-  const dates = rentRows.map(function (r) { return parseSheetDate(r['Date']); }).filter(function (d) { return d; });
+  const dates = rentRows
+    .map(function (r) { return extractPeriodStartDate(r['Detail']) || parseSheetDate(r['Date']); })
+    .filter(function (d) { return d; });
   if (!dates.length) return null;
   const minDate = new Date(Math.min.apply(null, dates.map(function (d) { return d.getTime(); })));
   const today = new Date();
@@ -824,6 +833,13 @@ function normalizeDateForCompare(value) {
   const mm = m[2].padStart(2, '0');
   const yyyy = m[3].length === 2 ? '20' + m[3] : m[3];
   return dd + '/' + mm + '/' + yyyy;
+}
+
+// Lee la fecha de inicio de un "Detail" con formato "dd/mm/yy[yy] - ..."
+// (el período que cubre un pago de renta) — null si no tiene esa forma.
+function extractPeriodStartDate(detail) {
+  const firstToken = String(detail || '').split(/\s*-\s*/)[0].trim();
+  return parseSheetDate(firstToken);
 }
 
 // Convierte un valor de fecha de la planilla (Date real, o texto
