@@ -138,6 +138,8 @@
 
   .dash-empty, .recent-empty { font-size: 13px; color: var(--muted); padding: 6px 0; }
 
+  .search-input { margin-bottom: 10px; font-size: 14px; padding: 9px 12px; }
+
   /* ---------- dashboard: charts ---------- */
   .chart-empty { font-size: 13px; color: var(--muted); padding: 6px 0 2px; }
 
@@ -368,6 +370,7 @@
     <div id="tenantSummary"><div class="dash-empty">Configura la conexión (⚙) para ver esto.</div></div>
 
     <div class="section-title">Historial</div>
+    <input type="text" class="search-input" id="searchTenant" placeholder="Buscar por detalle…">
     <div id="tenantHistory"></div>
   </form>
 
@@ -411,6 +414,7 @@
     <div id="landlordSummary"><div class="dash-empty">Configura la conexión (⚙) para ver esto.</div></div>
 
     <div class="section-title">Historial</div>
+    <input type="text" class="search-input" id="searchLandlord" placeholder="Buscar por detalle…">
     <div id="landlordHistory"></div>
   </form>
 
@@ -482,6 +486,7 @@
     <div id="expenseSummary"><div class="dash-empty">Configura la conexión (⚙) para ver esto.</div></div>
 
     <div class="section-title">Historial</div>
+    <input type="text" class="search-input" id="searchExpense" placeholder="Buscar por detalle…">
     <div id="expenseHistory"></div>
   </form>
 
@@ -767,6 +772,20 @@
       document.getElementById('form-' + activeTab).classList.add('active');
       renderActiveTab();
     });
+  });
+
+  // ---- búsqueda en historial por detalle ----
+  document.getElementById('searchTenant').addEventListener('input', function (ev) {
+    searchTenant = ev.target.value;
+    renderTenantHistory();
+  });
+  document.getElementById('searchLandlord').addEventListener('input', function (ev) {
+    searchLandlord = ev.target.value;
+    renderLandlordHistory();
+  });
+  document.getElementById('searchExpense').addEventListener('input', function (ev) {
+    searchExpense = ev.target.value;
+    renderExpenseHistory();
   });
 
   // ---- default dates ----
@@ -1153,6 +1172,14 @@
   var historyTenants = [];
   var historyExpenses = [];
   var historyLandlord = [];
+  var searchTenant = '', searchLandlord = '', searchExpense = '';
+
+  // Filtra un historial por texto en "Detail" (sin distinguir mayúsculas).
+  function filterByDetail(arr, query) {
+    var q = query.trim().toLowerCase();
+    if (!q) return arr;
+    return arr.filter(function (r) { return String(r['Detail'] || '').toLowerCase().indexOf(q) !== -1; });
+  }
 
   function loadAllAndRenderActive() {
     if (!cfg.url) { renderActiveTab(); return Promise.resolve(); }
@@ -1222,8 +1249,12 @@
   function renderTenantHistory() {
     var el = document.getElementById('tenantHistory');
     if (!cfg.url) { el.innerHTML = ''; return; }
-    if (!historyTenants.length) { el.innerHTML = '<div class="recent-empty">Sin movimientos todavía.</div>'; return; }
-    el.innerHTML = historyTenants.map(function (r, i) {
+    var list = filterByDetail(historyTenants, searchTenant);
+    if (!list.length) {
+      el.innerHTML = '<div class="recent-empty">' + (searchTenant.trim() ? 'Sin resultados para "' + searchTenant.trim() + '".' : 'Sin movimientos todavía.') + '</div>';
+      return;
+    }
+    el.innerHTML = list.map(function (r, i) {
       var pending = r['Payment Method'] === 'Pending';
       return '<div class="history-item" data-idx="' + i + '">' +
         '<span class="l">' + (r['Tenant'] || '—') + ' · ' + (r['Date'] || '') + '<br>' + (r['Type'] || '') + '</span>' +
@@ -1240,7 +1271,7 @@
     el.querySelectorAll('.history-edit-btn').forEach(function (btn) {
       btn.addEventListener('click', function (ev) {
         ev.stopPropagation();
-        openEditModal('Tenants', historyTenants[Number(btn.dataset.idx)]);
+        openEditModal('Tenants', list[Number(btn.dataset.idx)]);
       });
     });
   }
@@ -1259,8 +1290,12 @@
   function renderExpenseHistory() {
     var el = document.getElementById('expenseHistory');
     if (!cfg.url) { el.innerHTML = ''; return; }
-    if (!historyExpenses.length) { el.innerHTML = '<div class="recent-empty">Sin movimientos todavía.</div>'; return; }
-    el.innerHTML = historyExpenses.map(function (r, i) {
+    var list = filterByDetail(historyExpenses, searchExpense);
+    if (!list.length) {
+      el.innerHTML = '<div class="recent-empty">' + (searchExpense.trim() ? 'Sin resultados para "' + searchExpense.trim() + '".' : 'Sin movimientos todavía.') + '</div>';
+      return;
+    }
+    el.innerHTML = list.map(function (r, i) {
       return '<div class="history-item" data-idx="' + i + '">' +
         '<span class="l">' + (r['Date'] || '') + ' · ' + (r['Type'] || '') + '</span>' +
         '<span class="r">' + money(r['Amount']) + '</span>' +
@@ -1276,7 +1311,7 @@
     el.querySelectorAll('.history-edit-btn').forEach(function (btn) {
       btn.addEventListener('click', function (ev) {
         ev.stopPropagation();
-        openEditModal('Expenses', historyExpenses[Number(btn.dataset.idx)]);
+        openEditModal('Expenses', list[Number(btn.dataset.idx)]);
       });
     });
   }
@@ -1327,8 +1362,12 @@
   function renderLandlordHistory() {
     var el = document.getElementById('landlordHistory');
     if (!cfg.url) { el.innerHTML = ''; return; }
-    if (!historyLandlord.length) { el.innerHTML = '<div class="recent-empty">Sin movimientos todavía.</div>'; return; }
-    el.innerHTML = historyLandlord.map(function (r, i) {
+    var list = filterByDetail(historyLandlord, searchLandlord);
+    if (!list.length) {
+      el.innerHTML = '<div class="recent-empty">' + (searchLandlord.trim() ? 'Sin resultados para "' + searchLandlord.trim() + '".' : 'Sin movimientos todavía.') + '</div>';
+      return;
+    }
+    el.innerHTML = list.map(function (r, i) {
       return '<div class="history-item" data-idx="' + i + '">' +
         '<span class="l">' + (r['Date'] || '') + ' · ' + (r['Type'] || '') + '</span>' +
         '<span class="r">' + money(r['Amount']) + '</span>' +
@@ -1344,7 +1383,7 @@
     el.querySelectorAll('.history-edit-btn').forEach(function (btn) {
       btn.addEventListener('click', function (ev) {
         ev.stopPropagation();
-        openEditModal('To Landlord', historyLandlord[Number(btn.dataset.idx)]);
+        openEditModal('To Landlord', list[Number(btn.dataset.idx)]);
       });
     });
   }
