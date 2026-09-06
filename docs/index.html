@@ -1409,7 +1409,7 @@
       '<div class="hbar-track"><div class="hbar-fill" style="width:' + pctReal + '%"></div></div></div>' +
       '<div class="hbar-row"><div class="top"><span class="name">Esperado (tarifa)</span><span class="val">' + money(expected.amount) + '</span></div>' +
       '<div class="hbar-track"><div class="hbar-fill muted" style="width:' + pctExp + '%"></div></div></div>' +
-      '<div class="auto-note">"Esperado" es cuánto deberías llevar pagado si pagaras siempre puntual cada 2 semanas ($1.600), contando desde tu primer pago de renta (' + expected.sinceDate + ') hasta hoy — no es lo que debes ahora, es una referencia para ver si vas al día.</div>';
+      '<div class="auto-note">"Esperado" es cuánto deberías llevar pagado en total si pagaras siempre puntual cada 2 semanas ($1.600), contando desde tu primer pago de renta (' + expected.sinceDate + ') hasta hoy. Se mueve en escalones cada 2 semanas (no día a día): si ya pagaste el período que empezó hoy, el monto se queda igual hasta el próximo pago.</div>';
     if (rentPaidFromNico != null) {
       var pctNico = Math.max(3, Math.round(Math.abs(rentPaidFromNico) / max * 100));
       el.innerHTML +=

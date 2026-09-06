@@ -514,6 +514,14 @@ function computeBond(tenantRows, registryRows) {
 // adelantado (ej: pagado el 24/02 para el período que arranca el 03/03,
 // que fue el primer pago real de renta de la casa) no ancla el cálculo
 // antes de cuándo realmente empezó a correr la renta.
+//
+// El pago se hace por adelantado al INICIO de cada período de 2 semanas
+// (no en cuotas diarias) — por eso esto es un ESCALÓN, no una rampa
+// continua: se cuentan los períodos de 14 días que ya arrancaron desde el
+// anchor (incluido el día 0) y el monto se queda fijo entre una fecha de
+// pago y la siguiente. Confirmado por Nicolás: si ya pagó el período que
+// arrancó el 1/09, lo esperado HOY debe seguir siendo ese mismo monto —
+// no debe ir subiendo día a día hasta el próximo pago (14/09).
 function computeLandlordExpected(landlordRows) {
   const rentRows = landlordRows.filter(function (r) { return r['Type'] === 'Rent'; });
   const dates = rentRows
@@ -523,9 +531,9 @@ function computeLandlordExpected(landlordRows) {
   const minDate = new Date(Math.min.apply(null, dates.map(function (d) { return d.getTime(); })));
   const today = new Date();
   const days = Math.max(0, Math.round((today.getTime() - minDate.getTime()) / 86400000));
-  const fortnights = days / 14;
+  const periodsDue = Math.floor(days / 14) + 1;
   return {
-    amount: round2(fortnights * HOUSE_RENT_PER_WEEK * 2),
+    amount: round2(periodsDue * HOUSE_RENT_PER_WEEK * 2),
     sinceDate: Utilities.formatDate(minDate, Session.getScriptTimeZone(), 'dd/MM/yyyy')
   };
 }

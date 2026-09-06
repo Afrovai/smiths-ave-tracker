@@ -230,6 +230,40 @@ section('8. Renta esperada ancla en el primer pago tipo Rent, no en un Bond ante
 }
 
 // ---------------------------------------------------------------
+section('8c. Renta esperada avanza en ESCALONES cada 2 semanas, no día a día');
+{
+  // Caso real de Nicolás: paga por adelantado al inicio de cada período de
+  // 2 semanas. Si el período que arrancó hace pocos días ya está pagado,
+  // "esperado" debe quedarse en ese mismo monto hasta el próximo pago (14
+  // días después) — NO debe ir subiendo cada día que pasa mientras tanto.
+  function fmtDate(d) {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yy = String(d.getFullYear()).slice(-2);
+    return dd + '/' + mm + '/' + yy;
+  }
+  const today = new Date();
+  const periodStart = new Date(today.getTime() - 5 * 86400000); // hace 5 días
+  const periodEnd = new Date(periodStart.getTime() + 14 * 86400000);
+  const ss = new MockSpreadsheet();
+  ss._seed('Tenants', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail', 'Room', 'Tenant']]);
+  ss._seed('To Landlord', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail']]);
+  ss._seed('Expenses', [[], ['Date', 'Amount', 'Payment Method', 'Type', 'Detail']]);
+  const sandbox = loadCode(buildSandbox(ss));
+  callDoPost(sandbox, {
+    secret: SECRET, action: 'addLandlordPayment', amount: 1600, type: 'Rent',
+    date: periodStart.toISOString().slice(0, 10),
+    detail: fmtDate(periodStart) + ' - ' + fmtDate(periodEnd)
+  });
+  const res = callDoGet(sandbox, { secret: SECRET, summary: '1' });
+  check(
+    'esperado = 1600 (ya pagado el período actual, no una fracción de 1600 por los 5 días transcurridos)',
+    res.summary.landlord.expected.amount === 1600,
+    res.summary.landlord.expected
+  );
+}
+
+// ---------------------------------------------------------------
 section('8b. Renta esperada ancla en el INICIO DEL PERÍODO (Detail), no en la fecha de un pago adelantado');
 {
   // Caso real de Nicolás: Bond pagado 28/01, primer pago de Renta hecho
