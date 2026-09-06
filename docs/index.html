@@ -370,7 +370,7 @@
     <div id="tenantSummary"><div class="dash-empty">Configura la conexión (⚙) para ver esto.</div></div>
 
     <div class="section-title">Historial</div>
-    <input type="text" class="search-input" id="searchTenant" placeholder="Buscar por detalle…">
+    <input type="text" class="search-input" id="searchTenant" placeholder="Buscar (tipo, detalle, inquilino…)">
     <div id="tenantHistory"></div>
   </form>
 
@@ -414,7 +414,7 @@
     <div id="landlordSummary"><div class="dash-empty">Configura la conexión (⚙) para ver esto.</div></div>
 
     <div class="section-title">Historial</div>
-    <input type="text" class="search-input" id="searchLandlord" placeholder="Buscar por detalle…">
+    <input type="text" class="search-input" id="searchLandlord" placeholder="Buscar (tipo, detalle…)">
     <div id="landlordHistory"></div>
   </form>
 
@@ -486,7 +486,7 @@
     <div id="expenseSummary"><div class="dash-empty">Configura la conexión (⚙) para ver esto.</div></div>
 
     <div class="section-title">Historial</div>
-    <input type="text" class="search-input" id="searchExpense" placeholder="Buscar por detalle…">
+    <input type="text" class="search-input" id="searchExpense" placeholder="Buscar (tipo, detalle…)">
     <div id="expenseHistory"></div>
   </form>
 
@@ -1174,11 +1174,17 @@
   var historyLandlord = [];
   var searchTenant = '', searchLandlord = '', searchExpense = '';
 
-  // Filtra un historial por texto en "Detail" (sin distinguir mayúsculas).
+  // Filtra un historial buscando el texto en cualquiera de los campos que
+  // se ven en la fila (Detalle, Tipo, Inquilino, Método de pago) — así
+  // "electricity" encuentra los pagos de luz aunque esa palabra viva en
+  // "Type" y no en "Detail" (que suele ser solo un rango de fechas).
   function filterByDetail(arr, query) {
     var q = query.trim().toLowerCase();
     if (!q) return arr;
-    return arr.filter(function (r) { return String(r['Detail'] || '').toLowerCase().indexOf(q) !== -1; });
+    return arr.filter(function (r) {
+      return [r['Detail'], r['Type'], r['Tenant'], r['Payment Method']]
+        .some(function (v) { return String(v || '').toLowerCase().indexOf(q) !== -1; });
+    });
   }
 
   function loadAllAndRenderActive() {
