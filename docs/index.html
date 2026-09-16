@@ -1013,10 +1013,14 @@
     setTimeout(function () { el.className = 'banner'; }, 5000);
   }
 
-  // 20s de plazo — si Apps Script no responde en ese tiempo (cold start,
-  // sin conexión, etc.) se corta y se muestra un error claro en vez de
-  // dejar el botón "cargando" para siempre.
-  var POST_TIMEOUT_MS = 20000;
+  // 45s de plazo — Apps Script puede tardar más de lo que parece razonable
+  // (arranque en frío, o esperando el LockService si otra solicitud está en
+  // curso, que por sí solo puede tardar hasta 10s). Si el navegador corta
+  // ANTES de que Apps Script termine, el POST igual se guarda del lado del
+  // servidor aunque acá se vea como error — así que si de verdad se agota
+  // el tiempo, el mensaje avisa que puede que sí se haya guardado, para que
+  // no se reintente a ciegas y se termine duplicando el mismo movimiento.
+  var POST_TIMEOUT_MS = 45000;
 
   function post(payload) {
     if (!cfg.url) { openSettings(); return Promise.reject(new Error('Sin configurar')); }
@@ -1036,7 +1040,7 @@
       return r.json();
     }).catch(function (err) {
       if (timeoutId) clearTimeout(timeoutId);
-      if (timedOut) throw new Error('Tiempo de espera agotado (20s). Revisa tu conexión e intenta de nuevo.');
+      if (timedOut) throw new Error('Tiempo de espera agotado (45s) — puede que el movimiento SÍ se haya guardado del lado del servidor. Revisa el historial antes de volver a intentarlo, para no duplicarlo.');
       throw err;
     });
   }
