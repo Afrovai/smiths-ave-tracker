@@ -1,0 +1,11 @@
+{
+  "name": "10 Smiths Avenue — Registro rápido",
+  "short_name": "10 Smiths Ave",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f6f2",
+  "theme_color": "#0f6b52",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
