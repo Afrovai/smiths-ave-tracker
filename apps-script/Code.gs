@@ -148,6 +148,11 @@ function doPost(e) {
     } else if (body.action === 'addTenantProfile') {
       requireFields(body, ['name', 'room']);
       const sheet = ensureRegistrySheet(ss);
+      // Se guarda ANTES del upsert para poder comparar el bond viejo vs el
+      // nuevo después (upsertRegistryRow pisa la ficha existente).
+      const existing = getRegistryRows(ss).find(function (r) {
+        return String(r['Nombre']).trim().toLowerCase() === String(body.name).trim().toLowerCase();
+      });
       const fields = {
         'Nombre': body.name,
         'Pieza': body.room,
@@ -168,6 +173,40 @@ function doPost(e) {
       }
       const result = upsertRegistryRow(sheet, body.name, fields);
       created.push({ sheet: 'Arrendatarios', tenant: body.name, updated: result.updated });
+
+      const roomNumber = body.room ? String(ROOM_TO_NUMBER[body.room] || '') : '';
+
+      // Deja un registro en el historial de arrendatarios cada vez que se
+      // agrega una ficha nueva (no en cada edición de una ya existente).
+      if (!result.updated) {
+        appendRow(ss, 'Tenants', {
+          'Date': body.startDate || new Date().toISOString().slice(0, 10),
+          'Amount': 0,
+          'Type': 'Other',
+          'Detail': 'Nuevo inquilino agregado' + (body.room ? ' — ' + body.room : ''),
+          'Tenant': body.name,
+          'Room': roomNumber
+        });
+        created.push({ sheet: 'Tenants', tenant: body.name, note: 'tenant added' });
+      }
+
+      // Deja un registro de "Bond Held" en el historial la primera vez que
+      // la ficha queda con un bond > 0 — así cuenta en el historial y en
+      // los totales (paidByType['Bond Held']), sin duplicarse en ediciones
+      // posteriores (ya que "existing" ya tendrá el bond cargado).
+      const hadBondBefore = existing && Number(existing['Bond Monto']) > 0;
+      const newBondAmount = body.bondAmount != null && body.bondAmount !== '' ? Number(body.bondAmount) : 0;
+      if (!hadBondBefore && newBondAmount > 0) {
+        appendRow(ss, 'Tenants', {
+          'Date': body.bondDate || body.startDate || new Date().toISOString().slice(0, 10),
+          'Amount': newBondAmount,
+          'Type': 'Bond Held',
+          'Detail': body.bondDetail || ('Bond recibido de ' + body.name),
+          'Tenant': body.name,
+          'Room': roomNumber
+        });
+        created.push({ sheet: 'Tenants', tenant: body.name, type: 'Bond Held', amount: newBondAmount });
+      }
 
     } else if (body.action === 'deleteTenantProfile') {
       requireFields(body, ['id']);
