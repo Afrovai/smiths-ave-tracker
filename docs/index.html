@@ -810,6 +810,27 @@
   }
   function saveConfig(cfg) { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); }
 
+  // Importa la conexión desde un link especial (?u=...&s=...) que se manda
+  // por mensaje directo, NUNCA se sube al código público — así un
+  // dispositivo nuevo (o uno que perdió el localStorage, ej: al borrar y
+  // rehacer el acceso directo de pantalla de inicio) queda configurado con
+  // solo abrir ese link una vez, sin pegar la URL a mano. Se guarda en
+  // localStorage y se borra de la barra de direcciones de inmediato para no
+  // dejar el secreto visible en el historial del navegador.
+  (function importConfigFromUrl() {
+    var params = new URLSearchParams(window.location.search);
+    var u = params.get('u');
+    var s = params.get('s');
+    if (!u || !s) return;
+    var existing = getConfig();
+    saveConfig({
+      url: u,
+      secret: s,
+      defaultTenant: existing.defaultTenant || 'Juan Plata'
+    });
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+  })();
+
   var cfg = getConfig();
   var overlay = document.getElementById('overlay');
   var gearBtn = document.getElementById('gearBtn');
