@@ -501,16 +501,20 @@ function computeSummary(ss) {
       pagadoALandlord: round2(landlordTotal),
       gastadoEnCasa: round2(expenseTotal),
       // Incluye bond de ambos lados (recibido de tenants, pagado al
-      // arrendador) — no es un margen "limpio", se deja solo por si algo
-      // más lo usa. El KPI del Dashboard usa margenNetoSinBond.
+      // arrendador) — se deja solo por si algo más lo usa. El KPI del
+      // Dashboard usa gastoPropioSinBond.
       margenNeto: round2(totalPaidByTenants - landlordTotal - expenseTotal),
-      // El bond no es plata ganada ni gastada de verdad (es un depósito
-      // que se devuelve), así que se saca de ambos lados para que el
-      // margen refleje el flujo de caja real del día a día.
-      margenNetoSinBond: round2(
-        (totalPaidByTenants - (paidByType['Bond Held'] || 0)) -
-        (landlordTotal - (landlordByType['Bond'] || 0)) -
-        expenseTotal
+      // Cuánto ha puesto Nicolás de su bolsillo: la renta que él le paga al
+      // arrendador (sin bond) más los gastos de la casa, menos lo que los
+      // arrendatarios YA LE HAN PAGADO A ÉL por servicios/cuentas (luz,
+      // agua, gas, internet — sin contar renta, sin contar bond, y sin
+      // contar lo pendiente de cobrar). A propósito NO resta la renta que
+      // cobra de los arrendatarios — eso es aparte, esto es solo cuánto le
+      // cuesta a él la operación de la casa. Confirmado por Nicolás.
+      gastoPropioSinBond: round2(
+        (landlordByType['Rent'] || 0) + expenseTotal -
+        ((paidByType['Electricity'] || 0) + (paidByType['Water'] || 0) +
+         (paidByType['Internet'] || 0) + (paidByType['Gas'] || 0))
       )
     }
   };
